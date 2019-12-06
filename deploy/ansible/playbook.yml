@@ -1,0 +1,15 @@
+---
+- hosts: localhost
+  vars_files:
+    - vars.yml
+  roles:
+    - role: geerlingguy.repo-epel
+    - role: geerlingguy.repo-remi
+    - role: geerlingguy.apache
+    - role: geerlingguy.mysql
+    - role: geerlingguy.php-mysql
+    - role: geerlingguy.docker
+    - role: geerlingguy.composer
+    # - role: geerlingguy.java
+    - role: semuadmin.webmin
+    - role: oasis_roles.firewalld

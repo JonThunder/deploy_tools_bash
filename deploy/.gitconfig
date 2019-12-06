@@ -1,0 +1,34 @@
+[alias]
+  reporoot = rev-parse --show-toplevel
+  bltree = log        --decorate --graph --oneline
+  bltrees = log --all --decorate --graph --oneline
+  bltreed = log --all --decorate --graph --oneline --date=short --format=\"%C(bold cyan)%h%C(reset) %C(red)%ad%C(yellow)%d %C(reset)%s %C(cyan)(%an)\" 
+  lsvtree = log --all --decorate --graph --oneline --follow
+  noprivstatus = -c core.fileMode=false status
+  noprivst = -c core.fileMode=false status
+  st = status
+  co = checkout
+  br = branch
+  ff = merge --ff-only
+  tm = merge --no-ff
+  sh = show --no-patch
+  lg  = log --date=short --graph --format=\"%C(bold cyan)%h%C(reset) %C(red)%ad%C(yellow)%d %C(reset)%s %C(cyan)(%an)\"
+  lgnew = log --reverse --no-merges --abbrev --stat 'HEAD...@{u}'
+  lstag = log --simplify-by-decoration --graph --date=short --all --format=\"%C(red)%ad%C(yellow)%d %C(reset)%s\"
+  vd = difftool --diff-filter=M
+  amend = commit --amend --no-edit
+  up = rebase --preserve-merges '@{u}'
+  devpush = !git rebase origin/development && git push origin development && git bltree | head | perl -ne 'print "  $_"'
+
+[diff]
+  tool = meld
+[merge]
+  tool = meld
+[user]
+	name = Brian Flannery
+	email = brian.flannery@gmail.com
+[push]
+	default = simple
+[core]
+	trustctime = false
+    editor = vim

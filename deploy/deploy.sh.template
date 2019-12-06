@@ -1,0 +1,100 @@
+#!/bin/bash
+# # # USAGE:
+# # #   deploy.sh # Normal test use
+# # #   PROD_DEPLOY=true deploy.sh # Deploy for production
+# # #   DEPLOY_PATH=deployments/testVM DEPLOY_UP_LEVELS=../.. deploy.sh # Deploy a test path deployments/testVM/deploy
+# # #
+# # #   Where DEPLOY_PATH is the path from your project root to the deploy folder
+# # #   and DEPLOY_UP_LEVELS is the levels "up" from it: For example,
+# # #   for a DEPLOY_PATH like deployments/testVM, the DEPLOY_UP_LEVELS would be
+# # #   '../..' (two levels up).
+
+export PROD_DEPLOY=${PROD_DEPLOY:-false}
+export DEPLOY_PATH=${DEPLOY_PATH:-CONFIG_ME_DEPLOY_PATH}
+export DEPLOY_UP_LEVELS=${DEPLOY_UP_LEVELS:-CONFIG_ME_DEPLOY_UP_LEVELS}
+DIR0=$(dirname "$0")
+main() {
+  init;
+  if [[ $PROD_DEPLOY == true ]] ; then
+    if egrep '^(CENTOS|REDHAT)' /etc/os-release && hostname | egrep '^(example.com|staging.tbd)' ; then # NOTE: Change the allowable hostnames ... unless you're managing example.com and staging.tbd
+      sudo bash ./apache-deploy.sh bundle-prod
+    else
+      echo "WARNING: I checked the OS release name and hostname: I do not know this server. Not deploying here."
+      echo "NOTE: Attempting to bundle-prod from here..."
+      bash ./bundle.sh bundle-prod || die "ERROR $?: Failed to bundle-prod"
+      echo "NOTE: Please transfer the bundle-prod.tgz file and deploy-prod.sh to /tmp on the target server and run deploy-prod.sh (or deploy-prod.sh /path/some-other-bundle.tgz)" 1>&2
+    fi
+  else
+    if [[ $WITHIN_VM == true ]] ; then
+      deploy_code_in_vm
+    else
+      deploy_vm
+    fi ;
+  fi ;
+}
+die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
+init() {
+  DEPLOY_PATH=${DEPLOY_PATH:-.}
+  WITHIN_VM=${WITHIN_VM:-}
+  which vagrant >/dev/null 2>&1 || {
+    if [[ $WITHIN_VM == true ]] ; then
+      if ! grep ^flags /proc/cpuinfo | grep ' hypervisor ' >/dev/null ; then
+        die "ERROR: WITHIN_VM flag says we are already in a Virtual Machine ($WITHIN_VM) - but /proc/cpuinfo makes no mention of hypervisor"
+      fi
+    else
+      die "ERROR: Please install vagrant and a virtual machine provider (like VirtualBox)"
+    fi
+  }
+  if [[ $WITHIN_VM != true ]] ; then
+    if [[ ! -d ../.ngrok2 ]] ; then
+      if [[ -d ~/.ngrok2 ]] ; then
+        cp -rp ~/.ngrok2 ../.ngrok2
+      fi
+    fi
+    if [[ ! -d ../.ngrok2 ]] ; then
+      echo "WARNING: Ngrok won't work without a .ngrok2 folder with ngrok.yml defining authtoken"
+    fi
+    if [[ ! -f ../.gitconfig ]] && [[ -f ~/.gitconfig ]] ; then
+      cp ~/.gitconfig ../
+    fi
+  fi
+}
+deploy_code_in_vm() {
+  set -exu
+  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
+  # [[ -d ../client_code ]] || (cd .. && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD"
+  bash ./bundle.sh bundle-test
+  sudo bash ./apache-deploy.sh bundle-test
+  echo "SUCCESS" 1>&2
+  echo "(Bundling for prod now...)" 1>&2
+  [[ -d bundle-prod/web/node_modules ]] || cp -rp bundle-test/web/node_modules bundle-prod/web/node_modules
+  bash ./bundle.sh bundle-prod
+  echo "(Done with prod.)" 1>&2
+}
+vagrant_ssh_deploy() {
+  prov=/srv/vagrant_synced_folder/$DEPLOY_PATH/deploy/deploy.sh
+  vagrant ssh -c "(bash $prov | tee $prov.log) 2> >(tee -a $prov.err >&2)"
+}
+deploy_vm() {
+  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
+  # [[ -d ../client_code ]] || (cd .. && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD"
+  if is_running ; then
+    vagrant_ssh_deploy
+  else
+    vagrant up --provision
+    provisioned_count=$(cat .count 2>/dev/null)
+    [[ $provisioned_count ]] && provisioned_count=$((provisioned_count + 1)) \
+    || provisioned_count=1
+    echo $provisioned_count > .count
+    if [[ $provisioned_count -lt 2 ]] ; then
+      vagrant halt ; vagrant up ; vagrant_ssh_deploy
+    fi ;
+  fi ;
+}
+is_running() {
+  vagrant status | awk 'f;/Current machine states:/{f=1}' | awk 'f<2;/^$/{f++}' | grep '^default ' | egrep ' running( |$)' > /dev/null
+}
+is_running() {
+  vagrant status | awk 'f;/Current machine states:/{f=1}' | awk 'f<2;/^$/{f++}' | grep '^default ' | egrep ' running( |$)' > /dev/null
+}
+cd "$DIR0" && main "$@"

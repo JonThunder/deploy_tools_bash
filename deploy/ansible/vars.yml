@@ -1,0 +1,54 @@
+---
+# geerlingguy.apache https://galaxy.ansible.com/geerlingguy/apache
+apache_ports_configuration_items:
+  - regexp: "^ *AllowOverride"
+    line: "    AllowOverride  All"
+# XXX TODO Was this necessary?
+
+# geerlingguy.docker https://galaxy.ansible.com/geerlingguy/docker
+docker_compose_version: "1.25.0"
+
+# geerlingguy.mysql https://galaxy.ansible.com/geerlingguy/mysql
+mysql_root_username: root
+mysql_root_password: 'CONFIG_ME_DB_ROOT_P'
+# # The mysql_users are handled in another script (provision-db.sh)
+# mysql_users:
+#   - name: webmaster
+#     host: localhost
+#     . . .
+#   - name: webmaster
+#     host: '172.*'
+#     . . .
+
+# geerlingguy.php https://galaxy.ansible.com/geerlingguy/php
+php_default_version_debian: "7.2"
+# php_enablerepo: "remi-php56"
+php_enablerepo: "remi-php72"
+# phpmyadmin_enablerepo: "remi-php56"
+phpmyadmin_enablerepo: "remi-php72"
+php_packages_extra:
+# # TODO QQQ: Were all these commented lines important?
+#   - php56-php-pecl-xdebug
+#   - php72-php-cli
+#   - php72-php-common
+#   - php72-php-gd
+#   - php72-php-json
+#   - php72-php-mbstring
+#   - php72-php-mysqlnd
+#   - php72-php-opcache
+#   - php72-php-pdo
+  - php-pecl-mcrypt
+
+# geerlingguy.pip https://galaxy.ansible.com/geerlingguy/pip
+pip_install_packages:
+  - name: docker
+
+# semuadmin.webmin https://galaxy.ansible.com/semuadmin/webmin
+firewalld_enable: true
+install_utilities: true
+
+# oasis_roles.firewalld https://galaxy.ansible.com/oasis_roles/firewalld
+firewalld_services:
+  - http
+  - https
+  # - mysql # TODO: Uncomment if you need external access to MySQL server

@@ -1,0 +1,12 @@
+---
+- src: geerlingguy.repo-epel
+- src: geerlingguy.repo-remi
+- src: geerlingguy.apache
+- src: geerlingguy.mysql
+- src: geerlingguy.php-mysql
+- src: geerlingguy.docker
+- src: geerlingguy.composer
+# - src: geerlingguy.java
+- src: semuadmin.webmin
+- src: oasis_roles.firewalld
+# - src: devoinc.systemd_service
