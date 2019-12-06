@@ -50,7 +50,7 @@ mk_script() {
   echo "$function() {"
   echo "  cat > $file <<'EOF'"
   cat deploy/$file
-  echo -e "EOF\n} # END: $function(): $file\n"
+  echo -e "\nEOF\n} # END: $function(): $file\n"
 }
 mk_ansible_script() {
   local file=$1
@@ -60,6 +60,6 @@ mk_ansible_script() {
   fi
   echo "  cat > ansible/$file <<'EOF'"
   cat deploy/ansible/$file
-  echo -e "EOF\n# END: $file"
+  echo -e "\nEOF\n# END: $file"
 }
 cd "$DIR0" && main "$@"

@@ -1,4 +1,9 @@
-.vagrant
-Vagrantfile
 *.err
 *.log
+*.tgz
+.count
+.gitconfig
+.ngrok2
+.vagrant
+Vagrantfile
+db

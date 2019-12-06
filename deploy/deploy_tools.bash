@@ -98,7 +98,12 @@ pkg_installs() {
     apt-get -y update
     ls /etc/apt/sources.list.d/ansible-ubuntu-ansible-*.list || apt-add-repository ppa:ansible/ansible
   fi ;
-  $pkger -y install ansible curl wget git unzip jq nodejs npm expect || die "ERROR $?: Failed to $pkger install some initial packages"
+  local snap=''
+  if [[ $YES_NGROK == true ]] ; then
+    snap=snapd
+  fi
+  $pkger -y install ansible curl wget git unzip jq nodejs npm expect $snap \
+  || die "ERROR $?: Failed to $pkger install some initial packages"
   if [[ $yum ]] ; then
     $yum -y install httpd perl-Authen-PAM python-ndg_httpsclient python-urllib3 pyOpenSSL mod_ssl openssl yum-utils
   elif [[ $apt ]] ; then
@@ -130,8 +135,9 @@ apache_config() {
 config_ngrok() {
   if [[ $YES_NGROK == true ]] ; then
     if ! which ngrok ; then
-      systemctl enable --now snapd.socket ; sleep 10
-      snap install ngrok || { sleep 10 ; snap install ngrok ; }
+      systemctl enable --now snapd.socket && sleep 10 \
+      && snap install ngrok || { sleep 10 ; snap install ngrok ; } \
+      || die "ERROR $?: Failed to snap install ngrok"
     fi;
     if [[ -d /srv/vagrant_synced_folder ]] ; then
       testVM=$(cd /srv/vagrant_synced_folder/deployments && find testVM* -maxdepth 0 | tail -1)
@@ -267,6 +273,7 @@ post_apache_deploy() {
 # # # EXAMPLES
 
 mk_examples() {
+  mkdir -p deploy && cd deploy
   touch source_me.bash
   mk_deploy_script
   mk_vagrantfile_script
@@ -274,6 +281,7 @@ mk_examples() {
   mk_ansible_config
   mk_provision_db_script
   mk_extra_yum_script
+  mk_extra_yum_list
   mk_bundle_script
   mk_apache_deploy_script
   mk_deploy_prod_script
@@ -382,6 +390,7 @@ is_running() {
   vagrant status | awk 'f;/Current machine states:/{f=1}' | awk 'f<2;/^$/{f++}' | grep '^default ' | egrep ' running( |$)' > /dev/null
 }
 cd "$DIR0" && main "$@"
+
 EOF
 } # END: mk_deploy_script(): deploy.sh
 
@@ -407,6 +416,7 @@ Vagrant.configure("2") do |config|
       (bash "$prov" | tee "$prov.log") 2> >(tee -a "$prov.err" >&2)
   SHELL
 end
+
 EOF
 } # END: mk_vagrantfile_script(): ../Vagrantfile
 
@@ -454,13 +464,7 @@ init() {
     if [[ ! -d /srv/vagrant_synced_folder ]] ; then
       die "ERROR: Failed to find /srv/deploy folder (or even the /srv/vagrant_synced_folder). How do you intend to deploy to this server? How are you running this script ($0)?"
     fi
-
-    echo "DEBUG: DIR0=$DIR0" 1>&2
-    echo "DEBUG: deploy=$DIR0/deploy: " 1>&2 ;
-    ls -lart $DIR0/deploy 1>&2
-
-    cp -rp "$DIR0/deploy"/ /srv/deploy
-    exit 0
+    cp -rp "$DIR0"/ /srv/deploy || die "ERROR $?: Failed to cp $DIR0 to /srv/deploy"
   fi ;
 }
 # # # NOTE: Define EXTRA_PACKAGES or else redefine pkg_installs to control OS package installation.
@@ -468,6 +472,7 @@ init() {
 # # # NOTE: prep_ansible(), invoked by run_ansible, is also a good one to consider overriding
 
 cd "$DIR0" && main "$@"
+
 EOF
 } # END: mk_provision_script(): provision.sh
 
@@ -490,6 +495,7 @@ mk_ansible_config() {
     # - role: geerlingguy.java
     - role: semuadmin.webmin
     - role: oasis_roles.firewalld
+
 EOF
 # END: playbook.yml
   cat > ansible/requirements.yml <<'EOF'
@@ -505,6 +511,7 @@ EOF
 - src: semuadmin.webmin
 - src: oasis_roles.firewalld
 # - src: devoinc.systemd_service
+
 EOF
 # END: requirements.yml
   cat > ansible/vars.yml <<'EOF'
@@ -561,7 +568,9 @@ install_utilities: true
 firewalld_services:
   - http
   - https
-  # - mysql # TODO: Uncomment if you need external access to MySQL serverEOF
+  # - mysql # TODO: Uncomment if you need external access to MySQL server
+
+EOF
 # END: vars.yml
 } # END: mk_ansible_config()
 
@@ -630,6 +639,7 @@ main() {
   done
 }
 cd "$DIR0" && main "$@"
+
 EOF
 } # END: mk_provision_db_script(): provision-db.sh
 
@@ -656,6 +666,7 @@ main() {
 }
 die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
 cd "$DIR0" && main "$@"
+
 EOF
 } # END: mk_extra_yum_script(): extra_yum.sh
 
@@ -663,6 +674,7 @@ EOF
 mk_extra_yum_list() {
   cat > extra_yum.sh.list <<'EOF'
 zip
+
 
 EOF
 } # END: mk_extra_yum_list(): extra_yum.sh.list
@@ -731,6 +743,7 @@ fix_test_strings() {
   safe_sed CONFIG_ME_DB_ROOT_P "$DB_ROOT_P" $f
 }
 cd "$DIR0" && main "$@"
+
 EOF
 } # END: mk_bundle_script(): bundle.sh
 
@@ -746,6 +759,7 @@ main() {
   post_apache_deploy
 }
 cd "$DIR0" && main "$@"
+
 EOF
 } # END: mk_apache_deploy_script(): apache-deploy.sh
 
@@ -773,6 +787,7 @@ main() {
   PROD_DEPLOY=true bash /srv/deploy/provision.sh
 }
 main "$@"
+
 EOF
 } # END: mk_deploy_prod_script(): deploy-prod.sh
 

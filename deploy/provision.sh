@@ -39,13 +39,7 @@ init() {
     if [[ ! -d /srv/vagrant_synced_folder ]] ; then
       die "ERROR: Failed to find /srv/deploy folder (or even the /srv/vagrant_synced_folder). How do you intend to deploy to this server? How are you running this script ($0)?"
     fi
-
-    echo "DEBUG: DIR0=$DIR0" 1>&2
-    echo "DEBUG: deploy=$DIR0/deploy: " 1>&2 ;
-    ls -lart $DIR0/deploy 1>&2
-
-    cp -rp "$DIR0/deploy"/ /srv/deploy
-    exit 0
+    cp -rp "$DIR0"/ /srv/deploy || die "ERROR $?: Failed to cp $DIR0 to /srv/deploy"
   fi ;
 }
 # # # NOTE: Define EXTRA_PACKAGES or else redefine pkg_installs to control OS package installation.

@@ -78,7 +78,12 @@ pkg_installs() {
     apt-get -y update
     ls /etc/apt/sources.list.d/ansible-ubuntu-ansible-*.list || apt-add-repository ppa:ansible/ansible
   fi ;
-  $pkger -y install ansible curl wget git unzip jq nodejs npm expect || die "ERROR $?: Failed to $pkger install some initial packages"
+  local snap=''
+  if [[ $YES_NGROK == true ]] ; then
+    snap=snapd
+  fi
+  $pkger -y install ansible curl wget git unzip jq nodejs npm expect $snap \
+  || die "ERROR $?: Failed to $pkger install some initial packages"
   if [[ $yum ]] ; then
     $yum -y install httpd perl-Authen-PAM python-ndg_httpsclient python-urllib3 pyOpenSSL mod_ssl openssl yum-utils
   elif [[ $apt ]] ; then
@@ -110,8 +115,9 @@ apache_config() {
 config_ngrok() {
   if [[ $YES_NGROK == true ]] ; then
     if ! which ngrok ; then
-      systemctl enable --now snapd.socket ; sleep 10
-      snap install ngrok || { sleep 10 ; snap install ngrok ; }
+      systemctl enable --now snapd.socket && sleep 10 \
+      && snap install ngrok || { sleep 10 ; snap install ngrok ; } \
+      || die "ERROR $?: Failed to snap install ngrok"
     fi;
     if [[ -d /srv/vagrant_synced_folder ]] ; then
       testVM=$(cd /srv/vagrant_synced_folder/deployments && find testVM* -maxdepth 0 | tail -1)
@@ -247,6 +253,7 @@ post_apache_deploy() {
 # # # EXAMPLES
 
 mk_examples() {
+  mkdir -p deploy && cd deploy
   touch source_me.bash
   mk_deploy_script
   mk_vagrantfile_script
@@ -254,6 +261,7 @@ mk_examples() {
   mk_ansible_config
   mk_provision_db_script
   mk_extra_yum_script
+  mk_extra_yum_list
   mk_bundle_script
   mk_apache_deploy_script
   mk_deploy_prod_script
