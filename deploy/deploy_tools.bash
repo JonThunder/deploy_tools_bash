@@ -272,23 +272,25 @@ post_apache_deploy() {
 # # # EXAMPLES
 
 mk_examples() {
-  mkdir -p deploy && cd deploy
-  touch source_me.bash
-  mk_deploy_script
-  mk_vagrantfile_script
-  mk_provision_script
-  mk_ansible_config
-  mk_provision_db_script
-  mk_extra_yum_script
-  mk_extra_yum_list
-  mk_bundle_script
-  mk_apache_deploy_script
-  mk_deploy_prod_script
+  ( mkdir -p deploy && cd deploy
+    touch source_me.bash
+    mk_deploy_script
+    mk_vagrantfile_script
+    mk_provision_script
+    mk_ansible_config
+    mk_provision_db_script
+    mk_extra_yum_script
+    mk_extra_yum_list
+    mk_bundle_script
+    mk_apache_deploy_script
+    mk_deploy_prod_script
+  )
   cp_deploy_tools
 }
 
 cp_deploy_tools() {
-  
+  SOURCE_ZER0=${BASH_SOURCE[0]}
+  cp "$SOURCE_ZER0" ./deploy/ || die "ERROR $?: Failed to cp $SOURCE_ZERO to ./deploy/"
 }
 # # # Example deploy.sh:
 mk_deploy_script() {
