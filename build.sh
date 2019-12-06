@@ -9,6 +9,11 @@ DIR0=$(dirname "$0")
 main() {
   local DEPLOY_PATH=${1:-.}
   local DEPLOY_UP_LEVELS=${2:-.}
+  if [[ $DEPLOY_PATH != $DEPLOY_UP_LEVELS ]] \
+    && ( [[ $DEPLOY_PATH == '.' ]] || [[ $DEPLOY_UP_LEVELS == '.' ]] ) \
+    ; then
+    die "ERROR: DEPLOY_PATH ($DEPLOY_PATH) and DEPLOY_UP_LEVELS ($DEPLOY_UP_LEVELS) mismatch"
+  fi
   source deploy/deploy_tools.head2.bash
   cp deploy/deploy.sh.template deploy/deploy.sh
   cp Vagrantfile.template Vagrantfile
