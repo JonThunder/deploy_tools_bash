@@ -14,7 +14,7 @@ main() {
       printf '%s\n' "$p" >> /srv/provisioned/installable_extra_packages.txt ;
     fi ;
   done < $BASE.list
-  [[ -s "$badf" ]] || die "ERROR: Tried but failed to install some packages:$(echo; cat "$badf")"
+  [[ -s "$badf" ]] && die "ERROR: Tried but failed to install some packages:$(echo; cat "$badf")" || true
 }
 die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
 cd "$DIR0" && main "$@"

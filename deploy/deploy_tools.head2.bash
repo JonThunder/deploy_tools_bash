@@ -120,12 +120,11 @@ config_ngrok() {
       || die "ERROR $?: Failed to snap install ngrok"
     fi;
     if [[ -d /srv/vagrant_synced_folder ]] ; then
-      testVM=$(cd /srv/vagrant_synced_folder/deployments && find testVM* -maxdepth 0 | tail -1)
-      d=/srv/vagrant_synced_folder/deployments/$testVM/.ngrok2
+      d=/srv/vagrant_synced_folder/$DEPLOY_PATH/.ngrok2
       if [[ -d "$d" ]] ; then
         rsync -av "$d/" /home/vagrant/.ngrok2
       else
-        echo "WARNING: Found no $d folder (add an .ngrok2 folder with ngrok.yml to have it synced into the VM)" 1>&2
+        echo "WARNING: Found no $d folder (add an .ngrok2 folder with ngrok.yml to have it synced into the VM). (NOTE: DEPLOY_PATH=$DEPLOY_PATH)" 1>&2
       fi
     fi
   fi ;
@@ -265,5 +264,9 @@ mk_examples() {
   mk_bundle_script
   mk_apache_deploy_script
   mk_deploy_prod_script
+  cp_deploy_tools
 }
 
+cp_deploy_tools() {
+  
+}
