@@ -34,7 +34,6 @@ main() {
 }
 die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
 init() {
-  DEPLOY_PATH=${DEPLOY_PATH:-.}
   WITHIN_VM=${WITHIN_VM:-}
   which vagrant >/dev/null 2>&1 || {
     if [[ $WITHIN_VM == true ]] ; then
