@@ -16,7 +16,7 @@ main() {
     deploy_tools_path=$(dirname "$deploy_tools_path")
   fi;
   [[ $deploy_tools_path ]] && [[ -d $deploy_tools_path ]] || init
-  local sets=$-
+  local sets=$(echo "$-" | sed 's/[is]//g')
   set -exu
   if [[ -z $deploy_tools_path ]] || [[ ! -d $deploy_tools_path ]] ; then
     ( cd "$tmpd" && git clone https://github.com/JonThunder/deploy_tools_bash.git \
@@ -27,7 +27,7 @@ main() {
   set +exu
   (cd "$DEPLOY_PATH" && source "$deploy_tools_path/deploy_tools.bash" && mk_examples) \
   || die "ERROR $?: Failed to source deploy_tools.bash and run mk_examples"
-  set +$sets
+  set -$sets
   final
 }
 die() { echo "${1:-ERROR}" 1>&2 ; final ; exit ${2:-2}; }
