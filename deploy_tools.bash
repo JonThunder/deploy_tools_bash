@@ -288,7 +288,7 @@ mk_examples() {
     mk_bundle_script
     mk_apache_deploy_script
     mk_deploy_prod_script
-    chmod +x deploy/deploy.sh
+    chmod +x deploy.sh
   )
   cp_deploy_tools
 }
