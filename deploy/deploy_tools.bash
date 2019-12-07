@@ -113,15 +113,24 @@ pkg_installs() {
 }
 prep_ansible() {
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  if [[ $DOCKER_USERS ]] ; then
+  cd /srv/deploy/ansible
+  if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
         printf '%s\n' "  - $u"
       done
     ) >> vars.yml
   fi
-  cd /srv/deploy/ansible
   safe_sed 'CONFIG_ME_DB_ROOT_P' "$DB_ROOT_P" vars.yml
+  if [[ $YES_NGROK == true ]] ; then
+    egrep '^firewalld_ports_open:' vars.yml || {
+      cat >> vars.yml <<'EOFvy'
+firewalld_ports_open:
+  - proto: tcp
+    port: 4040
+EOFvy
+    }
+  fi
 }
 run_ansible() {
   cd /srv/deploy/ansible
@@ -375,10 +384,15 @@ init() {
     fi
   fi
 }
+git_clone_source() {
+  true
+  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
+  # [[ -d ../$DEPLOY_UP_LEVELS/client_code ]] \
+  # || (cd ../$DEPLOY_UP_LEVELS && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD/../DEPLOY_UP_LEVELS"
+}
 deploy_code_in_vm() {
   set -exu
-  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
-  # [[ -d ../client_code ]] || (cd .. && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD"
+  git_clone_source
   bash ./bundle.sh bundle-test
   sudo bash ./apache-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
@@ -392,8 +406,7 @@ vagrant_ssh_deploy() {
   vagrant ssh -c "(bash $prov | tee $prov.log) 2> >(tee -a $prov.err >&2)"
 }
 deploy_vm() {
-  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
-  # [[ -d ../client_code ]] || (cd .. && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD"
+  git_clone_source
   if is_running ; then
     vagrant_ssh_deploy
   else
@@ -425,11 +438,11 @@ mk_vagrantfile_script() {
 # vi: set ft=ruby :
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/centos7"
-  config.vm.network "forwarded_port", guest: 10000, host: 10000 # webmin
-  config.vm.network "forwarded_port", guest: 4040, host: 4041 # ngrok
-  config.vm.network "forwarded_port", guest: 8080, host: 8082 # npm run dev
-  config.vm.network "forwarded_port", guest: 80, host: 8081 # Apache HTTPD
-  config.vm.network "forwarded_port", guest: 443, host: 4431 # Apache HTTPD
+  config.vm.network "forwarded_port", guest: 10000, host: 10004 # webmin
+  config.vm.network "forwarded_port", guest: 4040, host: 4044 # ngrok
+  config.vm.network "forwarded_port", guest: 8080, host: 8084 # npm run dev
+  config.vm.network "forwarded_port", guest: 80, host: 8004 # Apache HTTPD
+  config.vm.network "forwarded_port", guest: 443, host: 4434 # Apache HTTPD
   config.vm.synced_folder "./", "/srv/vagrant_synced_folder"
   config.vm.provision "shell", inline: <<-SHELL
       exp='export WITHIN_VM=true'
@@ -726,9 +739,15 @@ main() {
   init
   local pwd0=${PWD:-$(pwd)}
   set -x
-  bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
 
-  bundle_git $BUNDLE/client_code git@github.com:user/my_app_browser_code.git origin "$CLIENT_BRANCH" # $CLIENT_BRANCH defined in source_me.bash
+  # Use a Git URL:
+  bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
+  # Or a relative path:
+  #   Suppose you have my_app_browser_code and my_deployment_repo in the same folder and my_deployment_repo
+  #   has testVM-project1/deploy. Then this relative path to my_app_browser_code will work for
+  #   my_deployment_repo/testVM-project1/deploy/bundle-test/client_code
+  #   with DEPLOY_PATH=my_deployment_repo/testVM-project1 and DEPLOY_UP_LEVELS=../..
+  bundle_git $BUNDLE/client_code ../../../$DEPLOY_UP_LEVELS/my_app_browser_code/.git origin "$CLIENT_BRANCH" # $CLIENT_BRANCH defined in source_me.bash
   
   cd $BUNDLE
   rm -rf var_www || true
