@@ -58,10 +58,15 @@ init() {
     fi
   fi
 }
+git_clone_source() {
+  true
+  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
+  # [[ -d ../$DEPLOY_UP_LEVELS/client_code ]] \
+  # || (cd ../$DEPLOY_UP_LEVELS && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD/../DEPLOY_UP_LEVELS"
+}
 deploy_code_in_vm() {
   set -exu
-  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
-  # [[ -d ../client_code ]] || (cd .. && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD"
+  git_clone_source
   bash ./bundle.sh bundle-test
   sudo bash ./apache-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
@@ -75,8 +80,7 @@ vagrant_ssh_deploy() {
   vagrant ssh -c "(bash $prov | tee $prov.log) 2> >(tee -a $prov.err >&2)"
 }
 deploy_vm() {
-  # # NOTE: Consider adding a line like the following to make it easier on bundle.sh:
-  # [[ -d ../client_code ]] || (cd .. && git clone git@bitbucket.com:user/my_app_client_code.git) || die "ERROR $?: Failed to obtain client_code in $PWD"
+  git_clone_source
   if is_running ; then
     vagrant_ssh_deploy
   else
