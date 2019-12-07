@@ -123,6 +123,7 @@ config_ngrok() {
       d=/srv/vagrant_synced_folder/$DEPLOY_PATH/.ngrok2
       if [[ -d "$d" ]] ; then
         rsync -av "$d/" /home/vagrant/.ngrok2
+        sudo rsync -av "$d/" /root/.ngrok2
       else
         echo "WARNING: Found no $d folder (add an .ngrok2 folder with ngrok.yml to have it synced into the VM). (NOTE: DEPLOY_PATH=$DEPLOY_PATH)" 1>&2
       fi
@@ -239,9 +240,10 @@ main() {
       echo $! > ngrok.pid
     }
 }
+die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
 main "$@"
 EOFng
-  chmod +x ngrok.sh && ./ngrok.sh
+  chmod +x ngrok.sh && ./ngrok.sh || die "ERROR $?: Failed to run ngrok.sh"
   sleep 5
 }
 post_apache_deploy() {
@@ -254,6 +256,7 @@ post_apache_deploy() {
 mk_examples() {
   ( mkdir -p deploy && cd deploy
     touch source_me.bash
+    mk_source_me
     mk_deploy_script
     mk_vagrantfile_script
     mk_provision_script
@@ -264,6 +267,7 @@ mk_examples() {
     mk_bundle_script
     mk_apache_deploy_script
     mk_deploy_prod_script
+    chmod +x deploy/deploy.sh
   )
   cp_deploy_tools
 }

@@ -1,4 +1,5 @@
 
+
 # # # USAGE:
 # # #   To bootstrap a project that uses this for its deployments, run
 # # #     curl https://raw.githubusercontent.com/JonThunder/deploy_tools_bash/master/mk_deploy.sh | bash
@@ -143,6 +144,7 @@ config_ngrok() {
       d=/srv/vagrant_synced_folder/$DEPLOY_PATH/.ngrok2
       if [[ -d "$d" ]] ; then
         rsync -av "$d/" /home/vagrant/.ngrok2
+        sudo rsync -av "$d/" /root/.ngrok2
       else
         echo "WARNING: Found no $d folder (add an .ngrok2 folder with ngrok.yml to have it synced into the VM). (NOTE: DEPLOY_PATH=$DEPLOY_PATH)" 1>&2
       fi
@@ -259,9 +261,10 @@ main() {
       echo $! > ngrok.pid
     }
 }
+die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
 main "$@"
 EOFng
-  chmod +x ngrok.sh && ./ngrok.sh
+  chmod +x ngrok.sh && ./ngrok.sh || die "ERROR $?: Failed to run ngrok.sh"
   sleep 5
 }
 post_apache_deploy() {
@@ -274,6 +277,7 @@ post_apache_deploy() {
 mk_examples() {
   ( mkdir -p deploy && cd deploy
     touch source_me.bash
+    mk_source_me
     mk_deploy_script
     mk_vagrantfile_script
     mk_provision_script
@@ -284,6 +288,7 @@ mk_examples() {
     mk_bundle_script
     mk_apache_deploy_script
     mk_deploy_prod_script
+    chmod +x deploy/deploy.sh
   )
   cp_deploy_tools
 }
@@ -292,6 +297,20 @@ cp_deploy_tools() {
   SOURCE_ZER0=${BASH_SOURCE[0]}
   cp "$SOURCE_ZER0" ./deploy/ || die "ERROR $?: Failed to cp $SOURCE_ZERO to ./deploy/"
 }
+# # # Example source_me.bash:
+mk_source_me() {
+  cat > source_me.bash <<'EOF'
+
+ADMIN_USERS="user1"
+DOCKER_USERS="vagrant $ADMIN_USERS"
+DATABASES='my_db1'
+DB_ROOT_P='databaseR00tPW' # For example
+FIX_STRINGS_IN_FILES="html/index.php
+"
+
+EOF
+} # END: mk_source_me(): source_me.bash
+
 # # # Example deploy.sh:
 mk_deploy_script() {
   cat > deploy.sh <<'EOF'

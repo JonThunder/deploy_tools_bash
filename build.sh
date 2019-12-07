@@ -21,8 +21,10 @@ main() {
     safe_sed CONFIG_ME_DEPLOY_PATH "$DEPLOY_PATH" "$f"
     safe_sed CONFIG_ME_DEPLOY_UP_LEVELS "$DEPLOY_UP_LEVELS" "$f"
   done
-  ( cat deploy/deploy_tools.head1.bash
+  ( echo
+    cat deploy/deploy_tools.head1.bash
     cat deploy/deploy_tools.head2.bash
+    mk_script "source_me.bash" mk_source_me
     mk_script "deploy.sh" mk_deploy_script
     mk_script "../Vagrantfile" mk_vagrantfile_script
     mk_script "provision.sh" mk_provision_script
