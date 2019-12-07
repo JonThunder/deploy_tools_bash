@@ -212,6 +212,8 @@ bundle_git() {
   fi
   git status | tail -1 | egrep '^nothing to commit' || die "ERROR: Bundle $dir has uncommitted changes."
   for f in $FIX_STRINGS_IN_FILES ; do
+    f=$(printf '%s' "$f" | sed 's/^ *//; s/ *$//')
+    [[ $f ]] || continue
     [[ ! -e "$f" ]] || $stringFixer "$f"
   done
   cd "$pwd0"
