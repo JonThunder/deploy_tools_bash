@@ -305,6 +305,8 @@ ADMIN_USERS="user1"
 DOCKER_USERS="vagrant $ADMIN_USERS"
 DATABASES='my_db1'
 DB_ROOT_P='databaseR00tPW' # For example
+DBU='my_dbu1'
+DBUP='databaseY00$3rPW'
 FIX_STRINGS_IN_FILES="html/index.php
 "
 
@@ -350,7 +352,6 @@ main() {
 }
 die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
 init() {
-  DEPLOY_PATH=${DEPLOY_PATH:-.}
   WITHIN_VM=${WITHIN_VM:-}
   which vagrant >/dev/null 2>&1 || {
     if [[ $WITHIN_VM == true ]] ; then
@@ -433,9 +434,11 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder "./", "/srv/vagrant_synced_folder"
   config.vm.provision "shell", inline: <<-SHELL
       exp='export WITHIN_VM=true'
+      exp=$(echo -e "$exp\nexport DEPLOY_PATH=.")
+      exp=$(echo -e "$exp\nexport DEPLOY_UP_LEVELS=.")
       f=/etc/profile.d/vagrant.sh
       [[ -f $f ]] || echo "$exp" >> $f
-      $exp
+      source "$f"
       prov=/srv/vagrant_synced_folder/./deploy/provision.sh
       (bash "$prov" | tee "$prov.log") 2> >(tee -a "$prov.err" >&2)
   SHELL

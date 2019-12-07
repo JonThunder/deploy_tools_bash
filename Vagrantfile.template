@@ -10,9 +10,11 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder "CONFIG_ME_DEPLOY_UP_LEVELS/", "/srv/vagrant_synced_folder"
   config.vm.provision "shell", inline: <<-SHELL
       exp='export WITHIN_VM=true'
+      exp=$(echo -e "$exp\nexport DEPLOY_PATH=CONFIG_ME_DEPLOY_PATH")
+      exp=$(echo -e "$exp\nexport DEPLOY_UP_LEVELS=CONFIG_ME_DEPLOY_UP_LEVELS")
       f=/etc/profile.d/vagrant.sh
       [[ -f $f ]] || echo "$exp" >> $f
-      $exp
+      source "$f"
       prov=/srv/vagrant_synced_folder/CONFIG_ME_DEPLOY_PATH/deploy/provision.sh
       (bash "$prov" | tee "$prov.log") 2> >(tee -a "$prov.err" >&2)
   SHELL
