@@ -93,15 +93,24 @@ pkg_installs() {
 }
 prep_ansible() {
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  if [[ $DOCKER_USERS ]] ; then
+  cd /srv/deploy/ansible
+  if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
         printf '%s\n' "  - $u"
       done
     ) >> vars.yml
   fi
-  cd /srv/deploy/ansible
   safe_sed 'CONFIG_ME_DB_ROOT_P' "$DB_ROOT_P" vars.yml
+  if [[ $YES_NGROK == true ]] ; then
+    egrep '^firewalld_ports_open:' vars.yml || {
+      cat >> vars.yml <<'EOFvy'
+firewalld_ports_open:
+  - proto: tcp
+    port: 4040
+EOFvy
+    }
+  fi
 }
 run_ansible() {
   cd /srv/deploy/ansible
