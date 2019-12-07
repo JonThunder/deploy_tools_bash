@@ -6,10 +6,11 @@ main() {
   local tmpd=$(mktemp -d)
   sudo rsync -a "$BUNDLE/var_www"/ "$tmpd"
 
-  local apacheu=apache
-  local apachegrp=apache
+  apacheu=apache
+  apachegrp=apache
   id vagrant && apachegrp=vagrant || true
   if egrep '^www-data:' /etc/passwd ; then apacheu=www-data ; fi ;
+  export apacheu ; export apachegrp
   sudo chown -R $apacheu:$apachegrp "$tmpd"
 
   sudo rsync -a "$tmpd"/ /var/www
