@@ -15,4 +15,5 @@ main() {
       echo $! > ngrok.pid
     }
 }
+die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
 main "$@"
