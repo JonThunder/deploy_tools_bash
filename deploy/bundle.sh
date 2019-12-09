@@ -17,6 +17,7 @@ main() {
   local pwd0=${PWD:-$(pwd)}
   set -x
 
+  bundle_dir $BUNDLE/db_sql ./db_sql
   # Use a Git URL:
   bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
   # Or a relative path:
@@ -25,7 +26,6 @@ main() {
   #   my_deployment_repo/testVM-project1/deploy/bundle-test/client_code
   #   with DEPLOY_PATH=my_deployment_repo/testVM-project1 and DEPLOY_UP_LEVELS=../..
   bundle_git $BUNDLE/client_code ../../../$DEPLOY_UP_LEVELS/my_app_browser_code/.git origin "$CLIENT_BRANCH" # $CLIENT_BRANCH defined in source_me.bash
-  bundle_dir $BUNDLE/db_sql ./db_sql
   
   cd $BUNDLE
   rm -rf var_www || true
