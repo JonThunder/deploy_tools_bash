@@ -93,7 +93,7 @@ pkg_installs() {
 }
 prep_ansible() {
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  cd /srv/$BUNDLE/deploy/ansible
+  cd /srv/deploy/$BUNDLE/ansible
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
@@ -114,7 +114,7 @@ EOFvy
 }
 run_ansible() {
   BUNDLE=${BUNDLE:-bundle-prod}
-  cd /srv/$BUNDLE/deploy/ansible
+  cd /srv/deploy/$BUNDLE/ansible
   prep_ansible
   ansible-galaxy install -r requirements.yml
   ansible-playbook playbook.yml
@@ -242,7 +242,7 @@ bundle_git() {
   suffix=$(printf '%s' "$suffix" | sed 's/^.*-//')
   [[ $stringFixer ]] || stringFixer="fix_${suffix}_strings"
   [[ $FIX_STRINGS_IN_FILES ]] || die "ERROR: bundle_git needs a list of files defined: \$FIX_STRINGS_IN_FILES"
-  
+
   mkdir -p "$dir"
   cd "$dir"
   egrep '^github\.com ' ~/.ssh/known_hosts || ssh-keyscan github.com >> ~/.ssh/known_hosts
@@ -294,7 +294,7 @@ main() {
     egrep '^web_addr: ' $ncfg || echo 'web_addr: 0.0.0.0:4040' >> $ncfg
     local pf=ngrok.pid
     local p=$(cat $pf)
-    [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || { 
+    [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || {
       nohup bash -c 'ngrok http 443 --log=stdout > /dev/null 2>&1' \
       > /tmp/ngrok_nohup.log 2>&1 &
       echo $! > ngrok.pid
