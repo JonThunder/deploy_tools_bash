@@ -69,6 +69,7 @@ deploy_code_in_vm() {
   git_clone_source
   bash ./bundle.sh bundle-test
   sudo bash ./apache-deploy.sh bundle-test
+  sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
   echo "(Bundling for prod now...)" 1>&2
   [[ -d bundle-prod/web/node_modules ]] || cp -rp bundle-test/web/node_modules bundle-prod/web/node_modules
