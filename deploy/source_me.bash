@@ -6,4 +6,5 @@ DB_ROOT_P='databaseR00tPW' # For example
 DBU='my_dbu1'
 DBUP='databaseY00$3rPW'
 FIX_STRINGS_IN_FILES="html/index.php
+  my_db1.sql
 "
