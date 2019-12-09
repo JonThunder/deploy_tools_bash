@@ -1,9 +1,6 @@
 ---
 # geerlingguy.apache https://galaxy.ansible.com/geerlingguy/apache
-apache_ports_configuration_items:
-  - regexp: "^ *AllowOverride"
-    line: "    AllowOverride  All"
-# XXX TODO Was this necessary?
+# (No special vars needed for Apache.)
 
 # geerlingguy.docker https://galaxy.ansible.com/geerlingguy/docker
 docker_compose_version: "1.25.0"
