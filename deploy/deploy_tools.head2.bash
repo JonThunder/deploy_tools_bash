@@ -216,6 +216,7 @@ bundle_git() {
   
   mkdir -p "$dir"
   cd "$dir"
+  egrep '^github\.com ' ~/.ssh/known_hosts || ssh-keyscan github.com >> ~/.ssh/known_hosts
   if [[ ! -d .git ]] ; then
     git init
     git remote add $remoteName $remoteURL
