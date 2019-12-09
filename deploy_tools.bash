@@ -100,7 +100,7 @@ pkg_installs() {
 }
 prep_ansible() {
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  cd /srv/$BUNDLE/deploy/ansible
+  cd /srv/deploy/$BUNDLE/ansible
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
@@ -121,7 +121,7 @@ EOFvy
 }
 run_ansible() {
   BUNDLE=${BUNDLE:-bundle-prod}
-  cd /srv/$BUNDLE/deploy/ansible
+  cd /srv/deploy/$BUNDLE/ansible
   prep_ansible
   ansible-galaxy install -r requirements.yml
   ansible-playbook playbook.yml
@@ -249,7 +249,7 @@ bundle_git() {
   suffix=$(printf '%s' "$suffix" | sed 's/^.*-//')
   [[ $stringFixer ]] || stringFixer="fix_${suffix}_strings"
   [[ $FIX_STRINGS_IN_FILES ]] || die "ERROR: bundle_git needs a list of files defined: \$FIX_STRINGS_IN_FILES"
-  
+
   mkdir -p "$dir"
   cd "$dir"
   egrep '^github\.com ' ~/.ssh/known_hosts || ssh-keyscan github.com >> ~/.ssh/known_hosts
@@ -301,7 +301,7 @@ main() {
     egrep '^web_addr: ' $ncfg || echo 'web_addr: 0.0.0.0:4040' >> $ncfg
     local pf=ngrok.pid
     local p=$(cat $pf)
-    [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || { 
+    [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || {
       nohup bash -c 'ngrok http 443 --log=stdout > /dev/null 2>&1' \
       > /tmp/ngrok_nohup.log 2>&1 &
       echo $! > ngrok.pid
@@ -440,7 +440,7 @@ deploy_code_in_vm() {
   sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
   echo "(Bundling for prod now...)" 1>&2
-  [[ -d bundle-prod/web/node_modules ]] || cp -rp bundle-test/web/node_modules bundle-prod/web/node_modules
+  [[ -d bundle-prod/client_code/node_modules ]] || cp -rp bundle-test/client_code/node_modules bundle-prod/client_code/node_modules
   bash ./bundle.sh bundle-prod
   echo "(Done with prod.)" 1>&2
 }
@@ -494,7 +494,7 @@ Vagrant.configure("2") do |config|
       f=/etc/profile.d/vagrant.sh
       [[ -f $f ]] || echo "$exp" >> $f
       source "$f"
-      prov=/srv/vagrant_synced_folder/./deploy/provision.sh
+      prov=/srv/vagrant_synced_folder/$DEPLOY_PATH/deploy/provision.sh
       (bash "$prov" | tee "$prov.log") 2> >(tee -a "$prov.err" >&2)
   SHELL
 end
@@ -781,8 +781,11 @@ main() {
   set -x
 
   bundle_dir $BUNDLE/db_sql ./db_sql
+  bundle_dir $BUNDLE/ansible ./ansible
+
   # Use a Git URL:
   bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
+
   # Or a relative path:
   #   Suppose you have my_app_browser_code and my_deployment_repo in the same folder and my_deployment_repo
   #   has testVM-project1/deploy. Then this relative path to my_app_browser_code will work for
@@ -801,7 +804,7 @@ main() {
   )
   cd $pwd0
   ( [[ ! -e $BUNDLE.tgz ]] || rm $BUNDLE.tgz )
-  tar -czf $BUNDLE.tgz *.sh *.list $BUNDLE/{var_www,db_sql,ansible}
+  tar -czf ../$BUNDLE.tgz *.sh *.list $BUNDLE/{var_www,db_sql,ansible}
   # Leaves $BUNDLE.tgz in the same folder as bundle.sh - with $BUNDLE/var_www in it
   # - and also any scripts or ansible config from the same folder as bundle.sh.
 }
