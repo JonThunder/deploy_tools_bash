@@ -17,3 +17,9 @@ mk_index_html() {
 </html>
 EOF
 }
+post_db_deploy() {
+  mysql my_db1 -B -v -e "INSERT INTO users SET id='$DBU', nick='$DBU' ON DUPLICATE KEY UPDATE nick='$DBU'"
+  for u in $ADMIN_USERS ; do
+    mysql my_db1 -B -v -e "INSERT INTO users SET id='$u', nick='admin_$u', admin=1 ON DUPLICATE KEY UPDATE nick='admin_$u', admin=1"
+  done
+}
