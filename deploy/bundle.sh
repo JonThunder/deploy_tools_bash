@@ -18,8 +18,11 @@ main() {
   set -x
 
   bundle_dir $BUNDLE/db_sql ./db_sql
+  bundle_dir $BUNDLE/ansible ./ansible
+
   # Use a Git URL:
   bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
+
   # Or a relative path:
   #   Suppose you have my_app_browser_code and my_deployment_repo in the same folder and my_deployment_repo
   #   has testVM-project1/deploy. Then this relative path to my_app_browser_code will work for
@@ -38,7 +41,7 @@ main() {
   )
   cd $pwd0
   ( [[ ! -e $BUNDLE.tgz ]] || rm $BUNDLE.tgz )
-  tar -czf $BUNDLE.tgz *.sh *.list $BUNDLE/{var_www,db_sql,ansible}
+  tar -czf ../$BUNDLE.tgz *.sh *.list $BUNDLE/{var_www,db_sql,ansible}
   # Leaves $BUNDLE.tgz in the same folder as bundle.sh - with $BUNDLE/var_www in it
   # - and also any scripts or ansible config from the same folder as bundle.sh.
 }
