@@ -183,13 +183,32 @@ last_steps() {
 }
 
 
+bundle_dir() {
+  local pwd0=${PWD:-$(pwd)}
+  local to_dir=$1
+  local from_dir=$2
+  local stringFixer=${3:-}
+  local suffix=$(dirname "$to_dir")
+  suffix=$(printf '%s' "$suffix" | sed 's/^.*-//')
+  [[ $stringFixer ]] || stringFixer="fix_${suffix}_strings"
+  [[ $FIX_STRINGS_IN_FILES ]] || die "ERROR: bundle_dir needs a list of files defined: \$FIX_STRINGS_IN_FILES"
+  mkdir -p "$to_dir"
+  rsync -a --exclude .git "$from_dir"/ "$to_dir"
+  cd "$to_dir"
+  for f in $FIX_STRINGS_IN_FILES ; do
+    f=$(printf '%s' "$f" | sed 's/^ *//; s/ *$//')
+    [[ $f ]] || continue
+    [[ ! -e "$f" ]] || $stringFixer "$f"
+  done
+  cd "$pwd0"
+}
 bundle_git() {
   local pwd0=${PWD:-$(pwd)}
   local dir=$1
   local remoteURL=$2
   local remoteName=${3:-origin}
   local branch=${4:-master}
-  local stringFixer=${5:-fix_test_strings}
+  local stringFixer=${5:-}
   local suffix=$(dirname "$dir")
   suffix=$(printf '%s' "$suffix" | sed 's/^.*-//')
   [[ $stringFixer ]] || stringFixer="fix_${suffix}_strings"
@@ -258,7 +277,10 @@ EOFng
   sleep 5
 }
 post_apache_deploy() {
-  true # PLACEHOLDER FUNCTION, replace me in apache-deploy.sh with more logic if necessary
+  true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
+}
+post_db_deploy() {
+  true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
 }
 
 
