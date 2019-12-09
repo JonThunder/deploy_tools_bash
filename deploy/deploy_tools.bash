@@ -190,13 +190,32 @@ last_steps() {
 }
 
 
+bundle_dir() {
+  local pwd0=${PWD:-$(pwd)}
+  local to_dir=$1
+  local from_dir=$2
+  local stringFixer=${3:-}
+  local suffix=$(dirname "$to_dir")
+  suffix=$(printf '%s' "$suffix" | sed 's/^.*-//')
+  [[ $stringFixer ]] || stringFixer="fix_${suffix}_strings"
+  [[ $FIX_STRINGS_IN_FILES ]] || die "ERROR: bundle_dir needs a list of files defined: \$FIX_STRINGS_IN_FILES"
+  mkdir -p "$to_dir"
+  rsync -a --exclude .git "$from_dir"/ "$to_dir"
+  cd "$to_dir"
+  for f in $FIX_STRINGS_IN_FILES ; do
+    f=$(printf '%s' "$f" | sed 's/^ *//; s/ *$//')
+    [[ $f ]] || continue
+    [[ ! -e "$f" ]] || $stringFixer "$f"
+  done
+  cd "$pwd0"
+}
 bundle_git() {
   local pwd0=${PWD:-$(pwd)}
   local dir=$1
   local remoteURL=$2
   local remoteName=${3:-origin}
   local branch=${4:-master}
-  local stringFixer=${5:-fix_test_strings}
+  local stringFixer=${5:-}
   local suffix=$(dirname "$dir")
   suffix=$(printf '%s' "$suffix" | sed 's/^.*-//')
   [[ $stringFixer ]] || stringFixer="fix_${suffix}_strings"
@@ -204,6 +223,7 @@ bundle_git() {
   
   mkdir -p "$dir"
   cd "$dir"
+  egrep '^github\.com ' ~/.ssh/known_hosts || ssh-keyscan github.com >> ~/.ssh/known_hosts
   if [[ ! -d .git ]] ; then
     git init
     git remote add $remoteName $remoteURL
@@ -219,6 +239,8 @@ bundle_git() {
   fi
   git status | tail -1 | egrep '^nothing to commit' || die "ERROR: Bundle $dir has uncommitted changes."
   for f in $FIX_STRINGS_IN_FILES ; do
+    f=$(printf '%s' "$f" | sed 's/^ *//; s/ *$//')
+    [[ $f ]] || continue
     [[ ! -e "$f" ]] || $stringFixer "$f"
   done
   cd "$pwd0"
@@ -263,7 +285,10 @@ EOFng
   sleep 5
 }
 post_apache_deploy() {
-  true # PLACEHOLDER FUNCTION, replace me in apache-deploy.sh with more logic if necessary
+  true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
+}
+post_db_deploy() {
+  true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
 }
 
 
@@ -303,6 +328,7 @@ DB_ROOT_P='databaseR00tPW' # For example
 DBU='my_dbu1'
 DBUP='databaseY00$3rPW'
 FIX_STRINGS_IN_FILES="html/index.php
+  my_db1.sql
 "
 
 EOF
@@ -382,6 +408,7 @@ deploy_code_in_vm() {
   git_clone_source
   bash ./bundle.sh bundle-test
   sudo bash ./apache-deploy.sh bundle-test
+  sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
   echo "(Bundling for prod now...)" 1>&2
   [[ -d bundle-prod/web/node_modules ]] || cp -rp bundle-test/web/node_modules bundle-prod/web/node_modules
@@ -543,10 +570,7 @@ EOF
   cat > ansible/vars.yml <<'EOF'
 ---
 # geerlingguy.apache https://galaxy.ansible.com/geerlingguy/apache
-apache_ports_configuration_items:
-  - regexp: "^ *AllowOverride"
-    line: "    AllowOverride  All"
-# XXX TODO Was this necessary?
+# (No special vars needed for Apache.)
 
 # geerlingguy.docker https://galaxy.ansible.com/geerlingguy/docker
 docker_compose_version: "1.25.0"
@@ -727,6 +751,7 @@ main() {
   local pwd0=${PWD:-$(pwd)}
   set -x
 
+  bundle_dir $BUNDLE/db_sql ./db_sql
   # Use a Git URL:
   bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
   # Or a relative path:
@@ -790,10 +815,11 @@ main() {
   local tmpd=$(mktemp -d)
   sudo rsync -a "$BUNDLE/var_www"/ "$tmpd"
 
-  local apacheu=apache
-  local apachegrp=apache
+  apacheu=apache
+  apachegrp=apache
   id vagrant && apachegrp=vagrant || true
   if egrep '^www-data:' /etc/passwd ; then apacheu=www-data ; fi ;
+  export apacheu ; export apachegrp
   sudo chown -R $apacheu:$apachegrp "$tmpd"
 
   sudo rsync -a "$tmpd"/ /var/www
