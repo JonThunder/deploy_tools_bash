@@ -100,7 +100,7 @@ pkg_installs() {
 }
 prep_ansible() {
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  cd /srv/deploy/ansible
+  cd /srv/$BUNDLE/deploy/ansible
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
@@ -120,7 +120,8 @@ EOFvy
   fi
 }
 run_ansible() {
-  cd /srv/deploy/ansible
+  BUNDLE=${BUNDLE:-bundle-prod}
+  cd /srv/$BUNDLE/deploy/ansible
   prep_ansible
   ansible-galaxy install -r requirements.yml
   ansible-playbook playbook.yml
@@ -772,7 +773,7 @@ main() {
   )
   cd $pwd0
   ( [[ ! -e $BUNDLE.tgz ]] || rm $BUNDLE.tgz )
-  tar -czf $BUNDLE.tgz *.sh *.list ansible $BUNDLE/var_www
+  tar -czf $BUNDLE.tgz *.sh *.list $BUNDLE/{var_www,db_sql,ansible}
   # Leaves $BUNDLE.tgz in the same folder as bundle.sh - with $BUNDLE/var_www in it
   # - and also any scripts or ansible config from the same folder as bundle.sh.
 }
