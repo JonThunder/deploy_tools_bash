@@ -127,7 +127,35 @@ run_ansible() {
   ansible-playbook playbook.yml
 }
 apache_config() {
-  true # PLACEHOLDER FUNCTION, replace me in provision.sh with more logic if necessary
+  true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
+  change_flag_file=/srv/provisioned/apache_config_change.txt
+  f=/etc/httpd/conf/httpd.conf
+   n=$(egrep -n 'Directory "/var/www/html"' $f | awk -F':' '{print $1}')
+  egrep -n '^ *AllowOverride ' $f | while read line ; do
+     line_n=$(printf '%s' "$line" | awk -F':' '{print $1}')
+    if [[ $line_n -gt $n ]] ; then
+      if sed -n "${line_n}p" $f | egrep ' All *$' ; then
+        echo true >> $change_flag_file
+         rx="${line_n}s/^ *AllowOverride.*\$/    AllowOverride All/"
+        echo "DEBUG: Replacing line $line_n in $f: rx=$rx" 1>&2
+        sed -i "$rx" $f
+      fi
+      break
+    fi
+  done
+  if [[ $YES_PHPMYADMIN == true ]] ; then
+      myIpCidr=$(ip addr show eth0 | egrep '^ *inet' | awk '{print $2}')
+      myIpCidrRE=$(printf '%s' "$myIpCidr" | sed 's/\./\\./g')
+      pma_f=/etc/httpd/conf.d/phpMyAdmin.conf
+      if ! egrep "Require ip $myIpCidrRE" $pma_f ; then
+        echo true >> $change_flag_file
+        sed -i "/<RequireAny>/a \       Require ip $myIpCidr" $pma_f
+      fi ;
+  fi
+
+  if [[ -f $change_flag_file ]] && [[ $(cat $change_flag_file) ]] ; then
+    systemctl reload httpd && echo -n > $change_flag_file || die "ERROR $?: Failed to systemctl reload httpd"
+  fi ;
 }
 config_ngrok() {
   if [[ $YES_NGROK == true ]] ; then
