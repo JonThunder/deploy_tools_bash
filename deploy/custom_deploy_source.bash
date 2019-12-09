@@ -3,7 +3,8 @@ post_apache_deploy() {
   mk_index_html
 }
 mk_index_html() {
-    [[ -e /var/www/html/index.html ]] || cat > /var/www/html/index.html <<'EOF'
+  local tmpf=$(mktemp)
+  [[ -e /var/www/html/index.html ]] || cat > $tmpf <<'EOF'
 <html>
   <head>
     <meta http-equiv="refresh" content="0; url=app.html" />
@@ -16,6 +17,8 @@ mk_index_html() {
   </body>
 </html>
 EOF
+  sudo chown $apacheu $tmpf
+  sudo -u $apacheu mv $tmpf /var/www/html/index.html
 }
 post_db_deploy() {
   mysql my_db1 -B -v -e "INSERT INTO users SET id='$DBU', nick='$DBU' ON DUPLICATE KEY UPDATE nick='$DBU'"
