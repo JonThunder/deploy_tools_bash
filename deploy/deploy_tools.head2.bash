@@ -93,7 +93,7 @@ pkg_installs() {
 }
 prep_ansible() {
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  cd /srv/deploy/ansible
+  cd /srv/$BUNDLE/deploy/ansible
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
@@ -113,7 +113,8 @@ EOFvy
   fi
 }
 run_ansible() {
-  cd /srv/deploy/ansible
+  BUNDLE=${BUNDLE:-bundle-prod}
+  cd /srv/$BUNDLE/deploy/ansible
   prep_ansible
   ansible-galaxy install -r requirements.yml
   ansible-playbook playbook.yml
