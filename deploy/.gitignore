@@ -1,3 +1,5 @@
 bundle-
 deploy.sh
 source_me.prod.bash
+*.pid
+bundle-*
