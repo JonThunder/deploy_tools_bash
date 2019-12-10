@@ -880,7 +880,7 @@ main() {
   fi
   cd $pwd0
   ( [[ ! -e $BUNDLE.tgz ]] || rm $BUNDLE.tgz )
-  tar -czf ../$BUNDLE.tgz *.sh *.list ansible $BUNDLE/{var_www,db_sql}
+  tar -czf $BUNDLE.tgz *.sh *.list ansible $BUNDLE/{var_www,db_sql}
   # Leaves $BUNDLE.tgz in the same folder as bundle.sh - with $BUNDLE/var_www in it
   # - and also any scripts or ansible config from the same folder as bundle.sh.
 }
