@@ -45,7 +45,7 @@ load_db_files() {
   errf=${errf:-}
   local _errf=${errf:-$(mktemp)}
   local e
-  ls *$ls_suffix | while read f ; do
+  ls *$ls_suffix 2>/dev/null | while read f ; do
     local db=$(printf '%s' "$f" | sed "s/$sed_strip_suffix\$//")
     echo "NOTE: Loading $f into database $db" 1>&2
     if ! $stdout_dump "$f" | mysql $db ; then
