@@ -108,6 +108,8 @@ prep_ansible() {
   if [[ $YES_PHPMYADMIN == true ]] ; then
     echo '    - role: geerlingguy.phpmyadmin' >> playbook.yml
     echo '- src: geerlingguy.phpmyadmin' >> requirements.yml
+  else
+    echo "NOTE: YES_PHPMYADMIN=$YES_PHPMYADMIN ... not 'true' ... so not adding phpmyadmin to playbook.yml and requirements.yml"
   fi
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
@@ -298,10 +300,22 @@ bundle_git() {
   done
   cd "$pwd0"
 }
+if ! LC_ALL=C type -t check_ngrok_max_loops | grep '^function$' ; then
+check_ngrok_max_loops() {
+  echo 9
+}
+fi
+get_apache_svc() {
+  which yum >/dev/null 2>&1 && echo apache2 || echo httpd
+}
 check_ngrok() {
   if [[ $BUNDLE != 'bundle-prod' ]] ; then
+    local max_loops=$(check_ngrok_max_loops)
+    local loops=0;
     NGROK_HOST=$(curl localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' | awk -F'/' '{print $NF}')
-    while [[ -z $NGROK_HOST ]] || [[ $NGROK_HOST == null ]] ; do
+    curl -f localhost:80 >/dev/null || sudo systemctl start $(get_apache_svc) || die "ERROR $?: Failed to start Apache service ($())"
+    while [[ $loops -lt $max_loops ]] && ( [[ -z $NGROK_HOST ]] || [[ $NGROK_HOST == null ]] ) ; do
+      loops=$((loops+1))
       if ps -ef | grep -v ' grep ' | grep '\/ngrok http' > /dev/null ; then
         sleep 5
       else run_ngrok
@@ -325,8 +339,10 @@ main() {
     egrep '^web_addr: ' $ncfg || echo 'web_addr: 0.0.0.0:4040' >> $ncfg
     local pf=ngrok.pid
     local p=$(cat $pf)
+    local logf=/dev/null
+    # logf=/tmp/ngrok.log # DEBUG
     [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || {
-      nohup bash -c 'ngrok http 443 --log=stdout > /dev/null 2>&1' \
+      nohup bash -c "ngrok http 443 --log=stdout > $logf 2>&1" \
       > /tmp/ngrok_nohup.log 2>&1 &
       echo $! > ngrok.pid
     }
@@ -471,7 +487,10 @@ deploy_code_in_vm() {
   sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
   echo "(Bundling for prod now...)" 1>&2
-  [[ -d bundle-prod/client_code/node_modules ]] || cp -rp bundle-test/client_code/node_modules bundle-prod/client_code/node_modules
+  local d=client_code/node_module
+  if [[ -d bundle-test/$d ]] ; then
+    [[ -d bundle-prod/$d ]] || cp -rp bundle-test/$d bundle-prod/$d
+  fi;
   bash ./bundle.sh bundle-prod
   echo "(Done with prod.)" 1>&2
 }
@@ -550,8 +569,10 @@ DIR0=$(dirname "$0")
 FULLDIR0=$(cd $DIR0 && pwd)
 
 YES_NGROK=true
+YES_PHPMYADMIN=true
 if [[ $PROD_DEPLOY == true ]] ; then
   YES_NGROK=false
+  YES_PHPMYADMIN=false
   # NOTE: You can add other "YES_" variables here like YES_DEBUG_APP and add logic to deploy some test-only or dev-only debug tool.
   [[ $BUNDLE ]] || BUNDLE='bundle-prod'
 fi ;
@@ -838,10 +859,12 @@ main() {
   mkdir var_www
   rsync -a --exclude .git server_code/ var_www
   rm -rf var_www/html/static/js || true
-  ( cd client_code && ( [[ -d node_modules ]] || npm install ) \
-    && npm run build \
-    && rsync -a --exclude .git dist/ ../var_www/html
-  )
+  if [[ -f client_code/package.json ]] ; then
+    ( cd client_code && ( [[ -d node_modules ]] || npm install ) \
+      && npm run build \
+      && rsync -a --exclude .git dist/ ../var_www/html
+    )
+  fi
   cd $pwd0
   ( [[ ! -e $BUNDLE.tgz ]] || rm $BUNDLE.tgz )
   tar -czf ../$BUNDLE.tgz *.sh *.list ansible $BUNDLE/{var_www,db_sql}
@@ -889,10 +912,11 @@ main() {
 
   apacheu=apache
   apachegrp=apache
-  id vagrant && apachegrp=vagrant || true
+  id vagrant >/dev/null && apachegrp=vagrant || true
   if egrep '^www-data:' /etc/passwd ; then apacheu=www-data ; fi ;
   export apacheu ; export apachegrp
   sudo chown -R $apacheu:$apachegrp "$tmpd"
+  sudo chown -R $apacheu:$apachegrp "/var/www/html"
 
   sudo rsync -a "$tmpd"/ /var/www
   sudo rm -rf "$tmpd"
