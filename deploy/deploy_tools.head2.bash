@@ -280,6 +280,7 @@ bundle_git() {
 
   mkdir -p "$dir"
   cd "$dir"
+  [[ -d ~/.ssh ]] || ( umask 077; mkdir -p ~/.ssh )
   egrep '^github\.com ' ~/.ssh/known_hosts || ssh-keyscan github.com >> ~/.ssh/known_hosts
   if [[ ! -d .git ]] ; then
     git init
@@ -291,7 +292,9 @@ bundle_git() {
     git checkout -b $branch-$suffix
   else
     git status | tail -1 | egrep '^nothing to commit' || die "ERROR: Bundle $dir has uncommitted changes."
-    git checkout $branch-$suffix && git fetch $remoteName && git merge $branch \
+    git fetch $remoteName \
+    && (git checkout $branch-$suffix || git checkout $branch && git checkout -b $branch-$suffix) \
+    && git merge --no-edit $branch \
     || die "ERROR $?: Failed to update Git bundle $dir branch $branch-$suffix from branch $branch"
   fi
   git status | tail -1 | egrep '^nothing to commit' || die "ERROR: Bundle $dir has uncommitted changes."
