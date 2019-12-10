@@ -12,8 +12,10 @@ DIR0=$(dirname "$0")
 FULLDIR0=$(cd $DIR0 && pwd)
 
 YES_NGROK=true
+YES_PHPMYADMIN=true
 if [[ $PROD_DEPLOY == true ]] ; then
   YES_NGROK=false
+  YES_PHPMYADMIN=false
   # NOTE: You can add other "YES_" variables here like YES_DEBUG_APP and add logic to deploy some test-only or dev-only debug tool.
   [[ $BUNDLE ]] || BUNDLE='bundle-prod'
 fi ;
