@@ -40,6 +40,7 @@ main() {
     mk_script "extra_yum.sh.list" mk_extra_yum_list
     mk_script "bundle.sh" mk_bundle_script
     mk_script "apache-deploy.sh" mk_apache_deploy_script
+    mk_script "db-deploy.sh" mk_db_deploy_script
     mk_script "deploy-prod.sh" mk_deploy_prod_script
     cat deploy/deploy_tools.foot.bash
   ) > deploy_tools.bash
