@@ -103,14 +103,11 @@ pkg_installs() {
 prep_ansible() {
   local pwd0=${PWD:-$(pwd)}
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  local sets=$(echo "$-" | sed 's/[is]//g')
-
-  set -exu
-  cd /srv/deploy && [[ -d $BUNDLE ]] || bash ./bundle.sh "$BUNDLE"
-  set +exu
-  set -$sets
-
   cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
+  if [[ $YES_PHPMYADMIN == true ]] ; then
+    echo '    - role: geerlingguy.phpmyadmin' >> playbook.yml
+    echo '- src: geerlingguy.phpmyadmin' >> requirements.yml
+  fi
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
@@ -118,7 +115,6 @@ prep_ansible() {
       done
     ) >> vars.yml
   fi
-  safe_sed 'CONFIG_ME_DB_ROOT_P' "$DB_ROOT_P" vars.yml
   if [[ $YES_NGROK == true ]] ; then
     egrep '^firewalld_ports_open:' vars.yml || {
       cat >> vars.yml <<'EOFvy'
@@ -128,8 +124,16 @@ firewalld_ports_open:
 EOFvy
     }
   fi
+  safe_sed 'CONFIG_ME_DB_ROOT_P' "$DB_ROOT_P" vars.yml
+  prep_ansible_extra
   cd "$pwd0"
 }
+if ! LC_ALL=C type -t prep_ansible_extra | grep '^function$' ; then
+prep_ansible_extra() {
+  true # PLACEHOLDER FUNCTION: Redefine in custom_deploy_source.bash to run more safe_sed commands on vars.yml, etc.
+  # safe_sed 'CONFIG_ME_DB_ROOT_P' "$DB_ROOT_P" vars.yml
+}
+fi
 run_ansible() {
   BUNDLE=${BUNDLE:-bundle-prod}
   cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
@@ -137,17 +141,21 @@ run_ansible() {
   ansible-galaxy install -r requirements.yml
   ansible-playbook playbook.yml
 }
+if ! LC_ALL=C type -t apache_config_extra | grep '^function$' ; then
+apache_config_extra() {
+  true # PLACEHOLDER FUNCTION: Redefine in custom_deploy_source.bash to run more config (and echo true > $change_flag_file if so)
+}
+fi
 apache_config() {
-  true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
   change_flag_file=/srv/provisioned/apache_config_change.txt
   f=/etc/httpd/conf/httpd.conf
-   n=$(egrep -n 'Directory "/var/www/html"' $f | awk -F':' '{print $1}')
+  local n=$(egrep -n 'Directory "/var/www/html"' $f | awk -F':' '{print $1}')
   egrep -n '^ *AllowOverride ' $f | while read line ; do
-     line_n=$(printf '%s' "$line" | awk -F':' '{print $1}')
+    local line_n=$(printf '%s' "$line" | awk -F':' '{print $1}')
     if [[ $line_n -gt $n ]] ; then
       if sed -n "${line_n}p" $f | egrep ' All *$' ; then
         echo true >> $change_flag_file
-         rx="${line_n}s/^ *AllowOverride.*\$/    AllowOverride All/"
+        local rx="${line_n}s/^ *AllowOverride.*\$/    AllowOverride All/"
         echo "DEBUG: Replacing line $line_n in $f: rx=$rx" 1>&2
         sed -i "$rx" $f
       fi
@@ -163,6 +171,7 @@ apache_config() {
         sed -i "/<RequireAny>/a \       Require ip $myIpCidr" $pma_f
       fi ;
   fi
+  apache_config_extra
 
   if [[ -f $change_flag_file ]] && [[ $(cat $change_flag_file) ]] ; then
     systemctl reload httpd && echo -n > $change_flag_file || die "ERROR $?: Failed to systemctl reload httpd"
@@ -326,12 +335,16 @@ EOFng
   chmod +x ngrok.sh && ./ngrok.sh || die "ERROR $?: Failed to run ngrok.sh"
   sleep 5
 }
+if ! LC_ALL=C type -t post_apache_deploy | grep '^function$' ; then
 post_apache_deploy() {
   true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
 }
+fi
+if ! LC_ALL=C type -t post_db_deploy | grep '^function$' ; then
 post_db_deploy() {
   true # PLACEHOLDER FUNCTION, replace me in custom_deploy_source.bash with more logic if necessary
 }
+fi
 
 
 # # # EXAMPLES
@@ -448,7 +461,10 @@ git_clone_source() {
 deploy_code_in_vm() {
   set -exu
   git_clone_source
-  [[ -f /srv/provisioned/provisioning.touch ]] || bash ./bundle.sh bundle-test
+
+  # [[ -f /srv/provisioned/provisioning.touch ]] || bash ./bundle.sh bundle-test
+  bash ./bundle.sh bundle-test
+
   sudo bash ./apache-deploy.sh bundle-test
   sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
@@ -550,9 +566,9 @@ main() {
   final
 }
 init() {
-  touch /srv/provisioned/provisioning.touch
-  source deploy_tools.bash
   mkdir -p /srv/provisioned
+  # touch /srv/provisioned/provisioning.touch # A handy way to check if the provision.sh script is running
+  source deploy_tools.bash
   provisioned_count=$(cat /srv/provisioned/count 2>/dev/null)
   [[ $provisioned_count ]] && provisioned_count=$((provisioned_count + 1)) \
   || provisioned_count=1
@@ -569,7 +585,8 @@ init() {
 # # #   Also, at the end of last_steps, a script called extra_yum.sh will be run, if it exists (and if you are provisioning a yum server).
 # # # NOTE: prep_ansible(), invoked by run_ansible, is also a good one to consider overriding
 final() {
-  f=/srv/provisioned/provisioning.touch [[ ! -f $f ]] || rm $f
+  true
+  # f=/srv/provisioned/provisioning.touch [[ ! -f $f ]] || rm $f
 }
 
 cd "$DIR0" && main "$@"
@@ -800,17 +817,19 @@ main() {
   set -x
 
   bundle_dir $BUNDLE/db_sql ./db_sql
-  bundle_dir $BUNDLE/ansible ./ansible
+  # bundle_dir $BUNDLE/ansible ./ansible
+  mkdir -p $BUNDLE/server_code
+  mkdir -p $BUNDLE/client_code
 
   # Use a Git URL:
-  bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
+  # bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
 
   # Or a relative path:
   #   Suppose you have my_app_browser_code and my_deployment_repo in the same folder and my_deployment_repo
   #   has testVM-project1/deploy. Then this relative path to my_app_browser_code will work for
   #   my_deployment_repo/testVM-project1/deploy/bundle-test/client_code
   #   with DEPLOY_PATH=my_deployment_repo/testVM-project1 and DEPLOY_UP_LEVELS=../..
-  bundle_git $BUNDLE/client_code ../../../$DEPLOY_UP_LEVELS/my_app_browser_code/.git origin "$CLIENT_BRANCH" # $CLIENT_BRANCH defined in source_me.bash
+  # bundle_git $BUNDLE/client_code ../../../$DEPLOY_UP_LEVELS/my_app_browser_code/.git origin "$CLIENT_BRANCH" # $CLIENT_BRANCH defined in source_me.bash
   
   cd $BUNDLE
   rm -rf var_www || true
@@ -823,7 +842,7 @@ main() {
   )
   cd $pwd0
   ( [[ ! -e $BUNDLE.tgz ]] || rm $BUNDLE.tgz )
-  tar -czf ../$BUNDLE.tgz *.sh *.list $BUNDLE/{var_www,db_sql,ansible}
+  tar -czf ../$BUNDLE.tgz *.sh *.list ansible $BUNDLE/{var_www,db_sql}
   # Leaves $BUNDLE.tgz in the same folder as bundle.sh - with $BUNDLE/var_www in it
   # - and also any scripts or ansible config from the same folder as bundle.sh.
 }
