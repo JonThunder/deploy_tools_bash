@@ -37,10 +37,12 @@ main() {
   mkdir var_www
   rsync -a --exclude .git server_code/ var_www
   rm -rf var_www/html/static/js || true
-  ( cd client_code && ( [[ -d node_modules ]] || npm install ) \
-    && npm run build \
-    && rsync -a --exclude .git dist/ ../var_www/html
-  )
+  if [[ -f client_code/package.json ]] ; then
+    ( cd client_code && ( [[ -d node_modules ]] || npm install ) \
+      && npm run build \
+      && rsync -a --exclude .git dist/ ../var_www/html
+    )
+  fi
   cd $pwd0
   ( [[ ! -e $BUNDLE.tgz ]] || rm $BUNDLE.tgz )
   tar -czf ../$BUNDLE.tgz *.sh *.list ansible $BUNDLE/{var_www,db_sql}
