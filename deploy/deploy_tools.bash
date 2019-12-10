@@ -150,22 +150,32 @@ apache_config_extra() {
   true # PLACEHOLDER FUNCTION: Redefine in custom_deploy_source.bash to run more config (and echo true > $change_flag_file if so)
 }
 fi
-apache_config() {
-  change_flag_file=/srv/provisioned/apache_config_change.txt
+fix_allow_override() {
+  change_flag_file=${change_flag_file:-/srv/provisioned/apache_config_change.txt}
   f=/etc/httpd/conf/httpd.conf
   local n=$(egrep -n 'Directory "/var/www/html"' $f | awk -F':' '{print $1}')
   egrep -n '^ *AllowOverride ' $f | while read line ; do
     local line_n=$(printf '%s' "$line" | awk -F':' '{print $1}')
     if [[ $line_n -gt $n ]] ; then
-      if sed -n "${line_n}p" $f | egrep ' All *$' ; then
+      if ! sed -n "${line_n}p" $f | egrep ' All *$' ; then
         echo true >> $change_flag_file
         local rx="${line_n}s/^ *AllowOverride.*\$/    AllowOverride All/"
         echo "DEBUG: Replacing line $line_n in $f: rx=$rx" 1>&2
         sed -i "$rx" $f
+      # else
+      #   ( echo "DEBUG: Skipping line $line_n:"
+      #     sed -n "${line_n}p" $f
+      #   ) 1>&2
       fi
       break
+    # else
+    #   echo "DEBUG: Skipping $line_n" 1>&2
     fi
   done
+}
+apache_config() {
+  change_flag_file=/srv/provisioned/apache_config_change.txt
+  fix_allow_override
   if [[ $YES_PHPMYADMIN == true ]] ; then
       myIpCidr=$(ip addr show eth0 | egrep '^ *inet' | awk '{print $2}')
       myIpCidrRE=$(printf '%s' "$myIpCidr" | sed 's/\./\\./g')
@@ -201,7 +211,8 @@ config_ngrok() {
 }
 init_git() {
   if [[ $PROD_DEPLOY == false ]] && [[ -d /srv/vagrant_synced_folder ]] ; then
-      f=/srv/vagrant_synced_folder/vm/.gitconfig
+      f=./.gitconfig
+      [[ -f "$f" ]] || f=/srv/vagrant_synced_folder/$DEPLOY_PATH/deploy/.gitconfig
       if [[ -f "$f" ]] ; then
         cat "$f" > /home/vagrant/.gitconfig
         chown vagrant /home/vagrant/.gitconfig
@@ -306,14 +317,14 @@ check_ngrok_max_loops() {
 }
 fi
 get_apache_svc() {
-  which yum >/dev/null 2>&1 && echo apache2 || echo httpd
+  which yum >/dev/null 2>&1 && echo httpd || echo apache2
 }
 check_ngrok() {
   if [[ $BUNDLE != 'bundle-prod' ]] ; then
     local max_loops=$(check_ngrok_max_loops)
     local loops=0;
     NGROK_HOST=$(curl localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' | awk -F'/' '{print $NF}')
-    curl -f localhost:80 >/dev/null || sudo systemctl start $(get_apache_svc) || die "ERROR $?: Failed to start Apache service ($())"
+    curl localhost >/dev/null || sudo systemctl start $(get_apache_svc) || die "ERROR $?: Failed to start Apache service ($())"
     while [[ $loops -lt $max_loops ]] && ( [[ -z $NGROK_HOST ]] || [[ $NGROK_HOST == null ]] ) ; do
       loops=$((loops+1))
       if ps -ef | grep -v ' grep ' | grep '\/ngrok http' > /dev/null ; then
@@ -380,6 +391,7 @@ mk_examples() {
     mk_extra_yum_list
     mk_bundle_script
     mk_apache_deploy_script
+    mk_db_deploy_script
     mk_deploy_prod_script
     chmod +x deploy.sh
   )
@@ -487,8 +499,9 @@ deploy_code_in_vm() {
   sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
   echo "(Bundling for prod now...)" 1>&2
-  local d=client_code/node_module
+  local d=client_code/node_modules
   if [[ -d bundle-test/$d ]] ; then
+    [[ -d $(dirname bundle-prod/$d) ]] || mkdir $(dirname bundle-prod/$d)
     [[ -d bundle-prod/$d ]] || cp -rp bundle-test/$d bundle-prod/$d
   fi;
   bash ./bundle.sh bundle-prod
@@ -793,7 +806,7 @@ main() {
   [[ -e $BASE.list ]] || die "ERROR: $0 expects a file named $0.list"
   while read p ; do
     if [[ -z $p ]] ; then continue ; fi
-    if ! yum -y install $p ; then
+    if ! yum -y install -q $p ; then
       echo "ERROR $?: Failed to install $p" ;
       printf '%s\n' "$p" >> "$badf"
     else
@@ -927,6 +940,74 @@ cd "$DIR0" && main "$@"
 
 EOF
 } # END: mk_apache_deploy_script(): apache-deploy.sh
+
+# # # Example db-deploy.sh:
+mk_db_deploy_script() {
+  cat > db-deploy.sh <<'EOF'
+#!/bin/bash
+
+# # # USAGE: db-deploy.sh # Deploys *.sql files from $BUNDLE/db_sql to mysql
+# # #        db-deploy.sh bundle-test # Deploys *.sql files from bundle-test/db_sql to mysql (overrides any other defined $BUNDLE)
+# # # NOTE: $BUNDLE defaults to bundle-prod
+# # # NOTE: if ./db_sql_large exists (relative to db-deploy.sh), it loads *.sql.gz and *.sql files from there first
+
+PWD0=${PWD:-$(pwd)}
+DIR0=$(dirname "$0")
+main() {
+  BUNDLE=${1:-bundle-prod}
+  source deploy_tools.bash
+  tmpf=$(mktemp)
+  err=$(echo 0 | tee $tmpf)
+  db_sql_large
+  db_sql
+}
+db_sql_large() {
+  local pwd0=${PWD:-$(pwd)}
+  local touchf=/srv/provisioned/db_done_loading_large_sources.touch
+  if [[ -d ./db_sql_large ]] \
+    && [[ ! -f $touchf ]] \
+  ; then
+    cd ./db_sql_large
+    load_db_files '.sql.gz' '\.sql\.gz' 'gunzip -c'
+    load_db_files '.sql' '\.sql' 'cat'
+    touch $touchf
+    cd "$pwd0"
+  fi ;
+}
+db_sql() {
+  local pwd0=${PWD:-$(pwd)}
+  local e
+  if [[ -d "$BUNDLE/db_sql" ]] ; then
+    cd "$BUNDLE/db_sql" || die "ERROR $?: Failed to cd $BUNDLE/db_sql"
+    load_db_files '.structure.sql' '\.structure\.sql' 'cat'
+    load_db_files '.sql' '\.sql' 'cat'
+    cd "$pwd0"
+  fi ;
+}
+load_db_files() {
+  local ls_suffix=$1
+  local sed_strip_suffix=$2
+  local stdout_dump=${3:-cat}
+  errf=${errf:-}
+  local _errf=${errf:-$(mktemp)}
+  local e
+  ls *$ls_suffix 2>/dev/null | while read f ; do
+    local db=$(printf '%s' "$f" | sed "s/$sed_strip_suffix\$//")
+    echo "NOTE: Loading $f into database $db" 1>&2
+    if ! $stdout_dump "$f" | mysql $db ; then
+      e=$?
+      echo "ERROR $e: Failed to gunzip and mysql load $f"
+      printf '%s' "$e" > $_errf
+    fi
+  done
+  err=$(cat $_errf)
+  [[ $errf ]] || rm "$_errf"
+  [[ $err -eq 0 ]] || die "ERROR $err: Failed to $stdout_dump *$ls_suffix files into mysql"
+}
+cd "$DIR0" && main "$@"
+
+EOF
+} # END: mk_db_deploy_script(): db-deploy.sh
 
 # # # Example deploy-prod.sh:
 mk_deploy_prod_script() {
