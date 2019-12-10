@@ -19,16 +19,18 @@ main() {
 
   bundle_dir $BUNDLE/db_sql ./db_sql
   bundle_dir $BUNDLE/ansible ./ansible
+  mkdir -p $BUNDLE/server_code
+  mkdir -p $BUNDLE/client_code
 
   # Use a Git URL:
-  bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
+  # bundle_git $BUNDLE/server_code git@github.com:user/my_app_server_code.git origin "$SERVER_BRANCH" # $SERVER_BRANCH defined in source_me.bash
 
   # Or a relative path:
   #   Suppose you have my_app_browser_code and my_deployment_repo in the same folder and my_deployment_repo
   #   has testVM-project1/deploy. Then this relative path to my_app_browser_code will work for
   #   my_deployment_repo/testVM-project1/deploy/bundle-test/client_code
   #   with DEPLOY_PATH=my_deployment_repo/testVM-project1 and DEPLOY_UP_LEVELS=../..
-  bundle_git $BUNDLE/client_code ../../../$DEPLOY_UP_LEVELS/my_app_browser_code/.git origin "$CLIENT_BRANCH" # $CLIENT_BRANCH defined in source_me.bash
+  # bundle_git $BUNDLE/client_code ../../../$DEPLOY_UP_LEVELS/my_app_browser_code/.git origin "$CLIENT_BRANCH" # $CLIENT_BRANCH defined in source_me.bash
   
   cd $BUNDLE
   rm -rf var_www || true
