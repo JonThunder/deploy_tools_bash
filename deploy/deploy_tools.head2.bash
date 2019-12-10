@@ -141,22 +141,32 @@ apache_config_extra() {
   true # PLACEHOLDER FUNCTION: Redefine in custom_deploy_source.bash to run more config (and echo true > $change_flag_file if so)
 }
 fi
-apache_config() {
-  change_flag_file=/srv/provisioned/apache_config_change.txt
+fix_allow_override() {
+  change_flag_file=${change_flag_file:-/srv/provisioned/apache_config_change.txt}
   f=/etc/httpd/conf/httpd.conf
   local n=$(egrep -n 'Directory "/var/www/html"' $f | awk -F':' '{print $1}')
   egrep -n '^ *AllowOverride ' $f | while read line ; do
     local line_n=$(printf '%s' "$line" | awk -F':' '{print $1}')
     if [[ $line_n -gt $n ]] ; then
-      if sed -n "${line_n}p" $f | egrep ' All *$' ; then
+      if ! sed -n "${line_n}p" $f | egrep ' All *$' ; then
         echo true >> $change_flag_file
         local rx="${line_n}s/^ *AllowOverride.*\$/    AllowOverride All/"
         echo "DEBUG: Replacing line $line_n in $f: rx=$rx" 1>&2
         sed -i "$rx" $f
+      # else
+      #   ( echo "DEBUG: Skipping line $line_n:"
+      #     sed -n "${line_n}p" $f
+      #   ) 1>&2
       fi
       break
+    # else
+    #   echo "DEBUG: Skipping $line_n" 1>&2
     fi
   done
+}
+apache_config() {
+  change_flag_file=/srv/provisioned/apache_config_change.txt
+  fix_allow_override
   if [[ $YES_PHPMYADMIN == true ]] ; then
       myIpCidr=$(ip addr show eth0 | egrep '^ *inet' | awk '{print $2}')
       myIpCidrRE=$(printf '%s' "$myIpCidr" | sed 's/\./\\./g')
@@ -192,7 +202,8 @@ config_ngrok() {
 }
 init_git() {
   if [[ $PROD_DEPLOY == false ]] && [[ -d /srv/vagrant_synced_folder ]] ; then
-      f=/srv/vagrant_synced_folder/vm/.gitconfig
+      f=./.gitconfig
+      [[ -f "$f" ]] || f=/srv/vagrant_synced_folder/$DEPLOY_PATH/deploy/.gitconfig
       if [[ -f "$f" ]] ; then
         cat "$f" > /home/vagrant/.gitconfig
         chown vagrant /home/vagrant/.gitconfig
@@ -297,14 +308,14 @@ check_ngrok_max_loops() {
 }
 fi
 get_apache_svc() {
-  which yum >/dev/null 2>&1 && echo apache2 || echo httpd
+  which yum >/dev/null 2>&1 && echo httpd || echo apache2
 }
 check_ngrok() {
   if [[ $BUNDLE != 'bundle-prod' ]] ; then
     local max_loops=$(check_ngrok_max_loops)
     local loops=0;
     NGROK_HOST=$(curl localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' | awk -F'/' '{print $NF}')
-    curl -f localhost:80 >/dev/null || sudo systemctl start $(get_apache_svc) || die "ERROR $?: Failed to start Apache service ($())"
+    curl localhost >/dev/null || sudo systemctl start $(get_apache_svc) || die "ERROR $?: Failed to start Apache service ($())"
     while [[ $loops -lt $max_loops ]] && ( [[ -z $NGROK_HOST ]] || [[ $NGROK_HOST == null ]] ) ; do
       loops=$((loops+1))
       if ps -ef | grep -v ' grep ' | grep '\/ngrok http' > /dev/null ; then
@@ -371,6 +382,7 @@ mk_examples() {
     mk_extra_yum_list
     mk_bundle_script
     mk_apache_deploy_script
+    mk_db_deploy_script
     mk_deploy_prod_script
     chmod +x deploy.sh
   )
