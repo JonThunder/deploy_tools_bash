@@ -92,7 +92,15 @@ pkg_installs() {
   [[ -z $EXTRA_PACKAGES ]] || $pkger -y install $EXTRA_PACKAGES
 }
 prep_ansible() {
+  local pwd0=${PWD:-$(pwd)}
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
+  local sets=$(echo "$-" | sed 's/[is]//g')
+
+  set -exu
+  cd /srv/deploy && [[ -d $BUNDLE ]] || bash ./bundle.sh "$BUNDLE"
+  set +exu
+  set -$sets
+
   cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
@@ -111,6 +119,7 @@ firewalld_ports_open:
 EOFvy
     }
   fi
+  cd "$pwd0"
 }
 run_ansible() {
   BUNDLE=${BUNDLE:-bundle-prod}
@@ -168,7 +177,7 @@ config_ngrok() {
     fi
   fi ;
 }
-last_steps() {
+init_git() {
   if [[ $PROD_DEPLOY == false ]] && [[ -d /srv/vagrant_synced_folder ]] ; then
       f=/srv/vagrant_synced_folder/vm/.gitconfig
       if [[ -f "$f" ]] ; then
@@ -176,6 +185,8 @@ last_steps() {
         chown vagrant /home/vagrant/.gitconfig
       fi
   fi
+}
+last_steps() {
   cd $FULLDIR0
   f=provision-db.sh
   if [[ -f "$f" ]] ; then
