@@ -67,7 +67,7 @@ git_clone_source() {
 deploy_code_in_vm() {
   set -exu
   git_clone_source
-  bash ./bundle.sh bundle-test
+  [[ -f /srv/provisioned/provisioning.touch ]] || bash ./bundle.sh bundle-test
   sudo bash ./apache-deploy.sh bundle-test
   sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
