@@ -75,7 +75,10 @@ deploy_code_in_vm() {
   sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
   echo "(Bundling for prod now...)" 1>&2
-  [[ -d bundle-prod/client_code/node_modules ]] || cp -rp bundle-test/client_code/node_modules bundle-prod/client_code/node_modules
+  local d=client_code/node_module
+  if [[ -d bundle-test/$d ]] ; then
+    [[ -d bundle-prod/$d ]] || cp -rp bundle-test/$d bundle-prod/$d
+  fi;
   bash ./bundle.sh bundle-prod
   echo "(Done with prod.)" 1>&2
 }
