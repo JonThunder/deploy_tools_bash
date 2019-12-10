@@ -7,7 +7,7 @@ main() {
   [[ -e $BASE.list ]] || die "ERROR: $0 expects a file named $0.list"
   while read p ; do
     if [[ -z $p ]] ; then continue ; fi
-    if ! yum -y install $p ; then
+    if ! yum -y install -q $p ; then
       echo "ERROR $?: Failed to install $p" ;
       printf '%s\n' "$p" >> "$badf"
     else
