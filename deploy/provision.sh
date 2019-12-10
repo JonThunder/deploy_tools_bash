@@ -23,12 +23,14 @@ main() {
   init
   pkg_installs
   init_admins
+  config_ngrok
   run_ansible
   apache_config
-  config_ngrok
   last_steps
+  final
 }
 init() {
+  touch /srv/provisioned/provisioning.touch
   source deploy_tools.bash
   mkdir -p /srv/provisioned
   provisioned_count=$(cat /srv/provisioned/count 2>/dev/null)
@@ -41,9 +43,13 @@ init() {
     fi
     cp -rp "$DIR0"/ /srv/deploy || die "ERROR $?: Failed to cp $DIR0 to /srv/deploy"
   fi ;
+  init_git
 }
 # # # NOTE: Define EXTRA_PACKAGES or else redefine pkg_installs to control OS package installation.
 # # #   Also, at the end of last_steps, a script called extra_yum.sh will be run, if it exists (and if you are provisioning a yum server).
 # # # NOTE: prep_ansible(), invoked by run_ansible, is also a good one to consider overriding
+final() {
+  f=/srv/provisioned/provisioning.touch [[ ! -f $f ]] || rm $f
+}
 
 cd "$DIR0" && main "$@"
