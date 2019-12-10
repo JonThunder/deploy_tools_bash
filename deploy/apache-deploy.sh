@@ -8,10 +8,11 @@ main() {
 
   apacheu=apache
   apachegrp=apache
-  id vagrant && apachegrp=vagrant || true
+  id vagrant >/dev/null && apachegrp=vagrant || true
   if egrep '^www-data:' /etc/passwd ; then apacheu=www-data ; fi ;
   export apacheu ; export apachegrp
   sudo chown -R $apacheu:$apachegrp "$tmpd"
+  sudo chown -R $apacheu:$apachegrp "/var/www/html"
 
   sudo rsync -a "$tmpd"/ /var/www
   sudo rm -rf "$tmpd"
