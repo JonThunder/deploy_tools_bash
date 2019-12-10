@@ -3,8 +3,10 @@
 # # #   To bootstrap a project that uses this for its deployments, run
 # # #     curl https://raw.githubusercontent.com/JonThunder/deploy_tools_bash/master/mk_deploy.sh | bash
 
-die() { echo "${1:-ERROR}" 1>&2 ; exit ${2:-2} ; }
-
+if ! LC_ALL=C type -t final | grep '^function$' ; then
+  final() { true ; }
+fi
+die() { echo "${1:-ERROR}" 1>&2 ; final; exit ${2:-2} ; }
 unbase64() {
     if [[ -z ${BASE64_DECODE_FLAG:-} ]] ; then
         BASE64_DECODE_FLAG=D
@@ -99,8 +101,16 @@ pkg_installs() {
   [[ -z $EXTRA_PACKAGES ]] || $pkger -y install $EXTRA_PACKAGES
 }
 prep_ansible() {
+  local pwd0=${PWD:-$(pwd)}
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  cd /srv/deploy/$BUNDLE/ansible
+  local sets=$(echo "$-" | sed 's/[is]//g')
+
+  set -exu
+  cd /srv/deploy && [[ -d $BUNDLE ]] || bash ./bundle.sh "$BUNDLE"
+  set +exu
+  set -$sets
+
+  cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
       for u in $DOCKER_USERS ; do
@@ -118,10 +128,11 @@ firewalld_ports_open:
 EOFvy
     }
   fi
+  cd "$pwd0"
 }
 run_ansible() {
   BUNDLE=${BUNDLE:-bundle-prod}
-  cd /srv/deploy/$BUNDLE/ansible
+  cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
   prep_ansible
   ansible-galaxy install -r requirements.yml
   ansible-playbook playbook.yml
@@ -175,7 +186,7 @@ config_ngrok() {
     fi
   fi ;
 }
-last_steps() {
+init_git() {
   if [[ $PROD_DEPLOY == false ]] && [[ -d /srv/vagrant_synced_folder ]] ; then
       f=/srv/vagrant_synced_folder/vm/.gitconfig
       if [[ -f "$f" ]] ; then
@@ -183,6 +194,8 @@ last_steps() {
         chown vagrant /home/vagrant/.gitconfig
       fi
   fi
+}
+last_steps() {
   cd $FULLDIR0
   f=provision-db.sh
   if [[ -f "$f" ]] ; then
@@ -435,7 +448,7 @@ git_clone_source() {
 deploy_code_in_vm() {
   set -exu
   git_clone_source
-  bash ./bundle.sh bundle-test
+  [[ -f /srv/provisioned/provisioning.touch ]] || bash ./bundle.sh bundle-test
   sudo bash ./apache-deploy.sh bundle-test
   sudo bash ./db-deploy.sh bundle-test
   echo "SUCCESS" 1>&2
@@ -530,12 +543,14 @@ main() {
   init
   pkg_installs
   init_admins
+  config_ngrok
   run_ansible
   apache_config
-  config_ngrok
   last_steps
+  final
 }
 init() {
+  touch /srv/provisioned/provisioning.touch
   source deploy_tools.bash
   mkdir -p /srv/provisioned
   provisioned_count=$(cat /srv/provisioned/count 2>/dev/null)
@@ -548,10 +563,14 @@ init() {
     fi
     cp -rp "$DIR0"/ /srv/deploy || die "ERROR $?: Failed to cp $DIR0 to /srv/deploy"
   fi ;
+  init_git
 }
 # # # NOTE: Define EXTRA_PACKAGES or else redefine pkg_installs to control OS package installation.
 # # #   Also, at the end of last_steps, a script called extra_yum.sh will be run, if it exists (and if you are provisioning a yum server).
 # # # NOTE: prep_ansible(), invoked by run_ansible, is also a good one to consider overriding
+final() {
+  f=/srv/provisioned/provisioning.touch [[ ! -f $f ]] || rm $f
+}
 
 cd "$DIR0" && main "$@"
 
