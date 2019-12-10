@@ -18,7 +18,7 @@ mk_index_html() {
 </html>
 EOF
   sudo chown $apacheu $tmpf
-  [[ -e /var/www/html/index.html ]] || sudo -u $apacheu mv $tmpf /var/www/html/index.html
+  [[ -e /var/www/html/index.html ]] && [[ -s /var/www/html/index.html ]] || sudo -u $apacheu mv $tmpf /var/www/html/index.html
 }
 post_db_deploy() {
   mysql my_db1 -B -v -e "INSERT INTO users SET id='$DBU', nick='$DBU' ON DUPLICATE KEY UPDATE nick='$DBU'"
