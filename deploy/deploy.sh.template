@@ -77,7 +77,7 @@ deploy_code_in_vm() {
   echo "(Bundling for prod now...)" 1>&2
   local d=client_code/node_modules
   if [[ -d bundle-test/$d ]] ; then
-    [[ -d $(dirname bundle-prod/$d) ]] || mkdir $(dirname bundle-prod/$d)
+    [[ -d $(dirname bundle-prod/$d) ]] || mkdir -p $(dirname bundle-prod/$d)
     [[ -d bundle-prod/$d ]] || cp -rp bundle-test/$d bundle-prod/$d
   fi;
   bash ./bundle.sh bundle-prod
