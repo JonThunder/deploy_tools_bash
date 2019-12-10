@@ -99,6 +99,8 @@ prep_ansible() {
   if [[ $YES_PHPMYADMIN == true ]] ; then
     echo '    - role: geerlingguy.phpmyadmin' >> playbook.yml
     echo '- src: geerlingguy.phpmyadmin' >> requirements.yml
+  else
+    echo "NOTE: YES_PHPMYADMIN=$YES_PHPMYADMIN ... not 'true' ... so not adding phpmyadmin to playbook.yml and requirements.yml"
   fi
   if [[ $DOCKER_USERS ]] && ! egrep '^docker_users:' vars.yml >/dev/null ; then
     ( echo 'docker_users:'
@@ -289,10 +291,22 @@ bundle_git() {
   done
   cd "$pwd0"
 }
+if ! LC_ALL=C type -t check_ngrok_max_loops | grep '^function$' ; then
+check_ngrok_max_loops() {
+  echo 9
+}
+fi
+get_apache_svc() {
+  which yum >/dev/null 2>&1 && echo apache2 || echo httpd
+}
 check_ngrok() {
   if [[ $BUNDLE != 'bundle-prod' ]] ; then
+    local max_loops=$(check_ngrok_max_loops)
+    local loops=0;
     NGROK_HOST=$(curl localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' | awk -F'/' '{print $NF}')
-    while [[ -z $NGROK_HOST ]] || [[ $NGROK_HOST == null ]] ; do
+    curl -f localhost:80 >/dev/null || sudo systemctl start $(get_apache_svc) || die "ERROR $?: Failed to start Apache service ($())"
+    while [[ $loops -lt $max_loops ]] && ( [[ -z $NGROK_HOST ]] || [[ $NGROK_HOST == null ]] ) ; do
+      loops=$((loops+1))
       if ps -ef | grep -v ' grep ' | grep '\/ngrok http' > /dev/null ; then
         sleep 5
       else run_ngrok
@@ -316,8 +330,10 @@ main() {
     egrep '^web_addr: ' $ncfg || echo 'web_addr: 0.0.0.0:4040' >> $ncfg
     local pf=ngrok.pid
     local p=$(cat $pf)
+    local logf=/dev/null
+    # logf=/tmp/ngrok.log # DEBUG
     [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || {
-      nohup bash -c 'ngrok http 443 --log=stdout > /dev/null 2>&1' \
+      nohup bash -c "ngrok http 443 --log=stdout > $logf 2>&1" \
       > /tmp/ngrok_nohup.log 2>&1 &
       echo $! > ngrok.pid
     }
