@@ -9,7 +9,7 @@ main() {
     egrep '^web_addr: ' $ncfg || echo 'web_addr: 0.0.0.0:4040' >> $ncfg
     local pf=ngrok.pid
     local p=$(cat $pf)
-    [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || { 
+    [[ -f $pf ]] && ps -f -p $p | egrep -v '^UID' | egrep $p || {
       nohup bash -c 'ngrok http 443 --log=stdout > /dev/null 2>&1' \
       > /tmp/ngrok_nohup.log 2>&1 &
       echo $! > ngrok.pid
