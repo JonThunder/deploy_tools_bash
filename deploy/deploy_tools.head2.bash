@@ -94,7 +94,8 @@ pkg_installs() {
 prep_ansible() {
   local pwd0=${PWD:-$(pwd)}
   echo 'localhost ansible_connection=local ansible_python_interpreter="/usr/bin/env python"' > /etc/ansible/hosts
-  cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
+  # cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
+  cd /srv/deploy/ansible || die "ERROR $?: Failed to cd /srv/deploy/ansible"
   if [[ $YES_PHPMYADMIN == true ]] ; then
     echo '    - role: geerlingguy.phpmyadmin' >> playbook.yml
     echo '- src: geerlingguy.phpmyadmin' >> requirements.yml
@@ -127,7 +128,8 @@ prep_ansible_extra() {
 fi
 run_ansible() {
   BUNDLE=${BUNDLE:-bundle-prod}
-  cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
+  # cd /srv/deploy/$BUNDLE/ansible || die "ERROR $?: Failed to cd /srv/deploy/$BUNDLE/ansible (BUNDLE=$BUNDLE)"
+  cd /srv/deploy/ansible || die "ERROR $?: Failed to cd /srv/deploy/ansible"
   prep_ansible
   ansible-galaxy install -r requirements.yml
   ansible-playbook playbook.yml
