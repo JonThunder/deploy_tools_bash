@@ -293,7 +293,7 @@ bundle_git() {
   else
     git status | tail -1 | egrep '^nothing to commit' || die "ERROR: Bundle $dir has uncommitted changes."
     git fetch $remoteName \
-    && (git checkout $branch-$suffix || git checkout $branch && git checkout -b $branch-$suffix) \
+    && ( git checkout $branch-$suffix || (git checkout $branch && git checkout -b $branch-$suffix) ) \
     && git merge --no-edit $branch \
     || die "ERROR $?: Failed to update Git bundle $dir branch $branch-$suffix from branch $branch"
   fi
