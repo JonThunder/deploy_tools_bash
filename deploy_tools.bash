@@ -289,6 +289,7 @@ bundle_git() {
 
   mkdir -p "$dir"
   cd "$dir"
+  [[ -d ~/.ssh ]] || ( umask 077; mkdir -p ~/.ssh )
   egrep '^github\.com ' ~/.ssh/known_hosts || ssh-keyscan github.com >> ~/.ssh/known_hosts
   if [[ ! -d .git ]] ; then
     git init
@@ -300,7 +301,9 @@ bundle_git() {
     git checkout -b $branch-$suffix
   else
     git status | tail -1 | egrep '^nothing to commit' || die "ERROR: Bundle $dir has uncommitted changes."
-    git checkout $branch-$suffix && git fetch $remoteName && git merge $branch \
+    git fetch $remoteName \
+    && ( git checkout $branch-$suffix || (git checkout $branch && git checkout -b $branch-$suffix) ) \
+    && git merge --no-edit $branch \
     || die "ERROR $?: Failed to update Git bundle $dir branch $branch-$suffix from branch $branch"
   fi
   git status | tail -1 | egrep '^nothing to commit' || die "ERROR: Bundle $dir has uncommitted changes."
@@ -501,7 +504,7 @@ deploy_code_in_vm() {
   echo "(Bundling for prod now...)" 1>&2
   local d=client_code/node_modules
   if [[ -d bundle-test/$d ]] ; then
-    [[ -d $(dirname bundle-prod/$d) ]] || mkdir $(dirname bundle-prod/$d)
+    [[ -d $(dirname bundle-prod/$d) ]] || mkdir -p $(dirname bundle-prod/$d)
     [[ -d bundle-prod/$d ]] || cp -rp bundle-test/$d bundle-prod/$d
   fi;
   bash ./bundle.sh bundle-prod
